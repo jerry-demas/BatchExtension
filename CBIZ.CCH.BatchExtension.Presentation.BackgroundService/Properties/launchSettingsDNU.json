@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CBIZ.CCH.BatchExtension.Presentation.BackgroundService": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

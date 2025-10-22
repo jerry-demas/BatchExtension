@@ -1,0 +1,10 @@
+@CBIZ_CCH_BatchExtension_API_HostAddress = http://localhost:5004
+
+GET {{CBIZ_CCH_BatchExtension_API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+GET {{CBIZ_CCH_BatchExtension_API_HostAddress}}/runbatch/["2025I:123456:V2","2025I:123456:V1","2035I:123456:V2"]
+Accept: application/json
+
+###
