@@ -2,6 +2,6 @@
 
 public static class ReturnTypes
 {
-    public static string FedState = "FedState";
-    public static string FedOnly = "FedOnly";
+    public const string FedState = "FedState";
+    public const string FedOnly = "FedOnly";
 }

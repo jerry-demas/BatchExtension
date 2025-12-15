@@ -1,3 +1,14 @@
-﻿namespace CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
+﻿
+using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObjects;
 
-public record BatchQueueStatusResponse(Guid QueueId, string QueueStatus);
+namespace CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
+
+public record BatchQueueStatusResponse(
+    Guid QueueId,    
+    string SubmittedBy,
+    DateTime SubmittedDate,
+    string QueueStatus,
+    string ReturnType,   
+    List<BatchExtensionData> BatchItems
+);
+

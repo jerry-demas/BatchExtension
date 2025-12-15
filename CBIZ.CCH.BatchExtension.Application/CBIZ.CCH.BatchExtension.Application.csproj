@@ -6,6 +6,8 @@
 		<PackageId>CBIZ.CCH.BatchExtension.Application</PackageId>
 		<TargetFramework>net9.0</TargetFramework>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<PreserveCompilationContext>true</PreserveCompilationContext>
+		<WarningsAsErrors>S2583</WarningsAsErrors>
 	</PropertyGroup>
 	
 	<ItemGroup>
@@ -14,14 +16,19 @@
 	  <None Remove="Blurbs\**" />
 	</ItemGroup>
 	
+	<ItemGroup>
+		<PackageReference Include="CBIZ.SharedPackages.AzureKeyVaultConfiguration" />
+		<PackageReference Include="CBIZ.SharedPackages.Either" />
+		<PackageReference Include="CBIZ.SharedPackages.Mail" />	  
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" />
+		<PackageReference Include="Microsoft.Extensions.Http" />
+		<PackageReference Include="Microsoft.Extensions.Options" />
+	</ItemGroup>
+	
   <ItemGroup>
-	  <PackageReference Include="CBIZ.SharedPackages.Either" />
-	  <PackageReference Include="CBIZ.SharedPackages.Mail" />	  
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
-	  <PackageReference Include="Microsoft.Extensions.Configuration" />
-	  <PackageReference Include="Microsoft.Extensions.Hosting" />
-	  <PackageReference Include="Microsoft.Extensions.Http" />
-	  <PackageReference Include="Microsoft.Extensions.Options" />
+    <Folder Include="Features\Helpers\" />
   </ItemGroup>
 
 </Project>

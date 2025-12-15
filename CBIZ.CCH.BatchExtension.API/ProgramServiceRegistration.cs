@@ -9,10 +9,10 @@ public static class ProgramServiceRegistration
             IConfiguration configuration)
     {
         builder.Services.AddLogging(loggingBuilder =>
-    {
-        loggingBuilder.ClearProviders();
-        loggingBuilder.AddNLog(new NLogLoggingConfiguration(builder.Configuration.GetSection("NLog")));
-    });
+        {
+            loggingBuilder.ClearProviders();
+            loggingBuilder.AddNLog(new NLogLoggingConfiguration(builder.Configuration.GetSection("NLog")));
+        });
         return builder;
     }
 }

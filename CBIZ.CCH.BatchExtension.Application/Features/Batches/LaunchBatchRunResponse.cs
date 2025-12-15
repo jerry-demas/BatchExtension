@@ -1,3 +1,3 @@
 ﻿namespace CBIZ.CCH.BatchExtension.Application.Features.Batches;
 
-public record LaunchBatchRunResponse(string message);
+public record LaunchBatchRunResponse(Guid QueueId, string SubmittedBy);

@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="NLog.Extensions.Logging" />
 	  <PackageReference Include="Sentry.NLog" />
+    <PackageReference Include="NLog.Database" />
 	  <PackageReference Include="System.Linq.Async" />   
   </ItemGroup>
 

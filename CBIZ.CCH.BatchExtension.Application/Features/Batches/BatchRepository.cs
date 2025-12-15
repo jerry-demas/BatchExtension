@@ -40,6 +40,25 @@ public class BatchRepository(
 
     }
 
+    public async Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(int days, CancellationToken cancellationToken = default)
+    {
+        try
+        {           
+            var cutoff = DateTime.UtcNow.AddDays(-days);
+            return await _dbContext.Batches                
+                .AsNoTracking()
+                .Where(b => b.CreationDate >= cutoff)
+                .OrderByDescending(b => b.CreationDate)
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in AddBatchAsync");
+            return new BatchExtensionException($"Error getting batch in GetBatchAsync ", ex);
+        }
+
+    }
+
     public async Task<Possible<BatchExtensionException>> AddBatchAsync(List<BatchExtensionData> batchExtensions, CancellationToken cancellationToken = default)
     {
         try
@@ -56,20 +75,55 @@ public class BatchRepository(
         }
     }
 
-    public async Task<Either<BatchQueueStatusResponse, BatchExtensionException>> GetQueueStatus(Guid queueId, CancellationToken cancellationToken = default)
+    public async Task<Either<List<BatchQueueStatusResponse>, BatchExtensionException>> GetQueueStatus(Guid queueId, CancellationToken cancellationToken = default)
     {
         try
-        {
-            var result = await _dbContext.BatchQueue
-                .Where(_ => _.QueueId == queueId)
-                .AsNoTracking()
-                .Select(x => new BatchQueueStatusResponse(x.QueueId, x.QueueStatus))
-                .FirstOrDefaultAsync(cancellationToken);
+        {            
+            
+            var returnList = await _dbContext.BatchQueue
+                .Include(q => q.BatchExtensionData)                
+                .Select(q => new BatchQueueStatusResponse(
+                    q.QueueId,                    
+                    q.SubmittedBy,
+                    q.SubmittedDate,
+                    q.QueueStatus,
+                    q.ReturnType,
+                    q.BatchExtensionData                        
+                        .Select(d =>  new BatchExtensionData
+                        {
+                            Id = d.Id,
+                            QueueIDGUID = d.QueueIDGUID,
+                            FirmFlowId = d.FirmFlowId,
+                            TaxReturnId = d.TaxReturnId,
+                            ClientName = d.ClientName,
+                            ClientNumber = d.ClientNumber,
+                            OfficeLocation = d.OfficeLocation,
+                            EngagementType = d.EngagementType,
+                            BatchId = d.BatchId,
+                            BatchItemGuid = d.BatchItemGuid,
+                            BatchItemStatus = d.BatchItemStatus,
+                            StatusDescription = d.StatusDescription,
+                            FileName = d.FileName,
+                            FileDownLoadedFromCCH = d.FileDownLoadedFromCCH,
+                            FileUploadedToGFR = d.FileUploadedToGFR,
+                            GfrDocumentId = d.GfrDocumentId,
+                            CreationDate = d.CreationDate,
+                            UpdatedDate = d.UpdatedDate
+                    }).ToList()))
+                .ToListAsync(cancellationToken);
+            
+            
+            if (returnList is null || returnList.Count == 0)
+                return new BatchExtensionException($"No queues found.");
 
-            if (result is null)
-                return new BatchExtensionException($"Queue ID {queueId} not found.");
+            if(!queueId.Equals(Guid.Empty)){
+                returnList = returnList.Where(q => q.QueueId == queueId).ToList();
+                
+                if (returnList.Count == 0)
+                    return new BatchExtensionException($"No queues found for queueId {queueId}.");
+            }
 
-            return result;
+            return returnList;
         }
         catch (Exception ex)
         {
@@ -119,7 +173,7 @@ public class BatchRepository(
         {
 
             _dbContext.BatchQueue.Add(batchQueue);
-            var retGuid = await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
             return batchQueue.QueueId;
 
         }
@@ -152,58 +206,6 @@ public class BatchRepository(
 
     }
     
-    /*    public async Task<Possible<BatchExtensionException>> UpdateQueueAsync(BatchExtensionQueue batchQueue, CancellationToken cancellationToken = default)
-    {
-
-        try
-        {
-            var queueItem = await _dbContext.BatchQueue
-                        .FirstOrDefaultAsync(_ => _.QueueId == batchQueue.QueueId, cancellationToken);
-
-            if (queueItem is not null)
-            {
-                batchQueue.UpdateExtensionQueueDbFrom(batchQueue);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
-
-            return Possible.Completed;
-
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred in UpdateQueueAsync");
-            return new BatchExtensionException($"Error updating the database in UpdateQueueAsync Id {batchQueue.QueueId} ", ex);
-        }
-
-    }
-    */
-
-/*
-    public async Task<Possible<BatchExtensionException>> UpdateQueueStatusAsync(Guid queueId, string status, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-
-            await _dbContext.BatchQueue
-                .Where(x => x.QueueId == queueId)
-                .ExecuteUpdateAsync(s =>
-                    s.SetProperty(b => b.QueueStatus, b => status),
-                    cancellationToken);
-
-            return Possible.Completed;
-
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred in UpdateQueueStatusAsync");
-            return new BatchExtensionException($"Error updating the database in UpdateQueueStatusAsync Id {queueId} ", ex);
-
-        }
-
-    }
-*/
-
-
     public async Task<Possible<BatchExtensionException>> UpdateBatchExtensionItemAsync<T>(
         Expression<Func<T, bool>> predicate,
         Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> setProperties,
@@ -220,7 +222,7 @@ public class BatchRepository(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error updating entity {typeof(T).Name}");
+            _logger.LogError(ex, "Error updating entity {EntityType}", typeof(T).Name);
             return new BatchExtensionException($"Error updating {typeof(T).Name}", ex);
         }
     }
@@ -243,7 +245,7 @@ public class BatchRepository(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error updating entity {typeof(T).Name}");
+            _logger.LogError(ex, "Error updating entity {EntityType}", typeof(T).Name);
             return new BatchExtensionException($"Error updating {typeof(T).Name}", ex);
         }
     }

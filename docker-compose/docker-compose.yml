@@ -1,0 +1,36 @@
+services:
+  cch-batch-extension:
+    image: cbizappdev-c4erg2gbekgvfxhd.azurecr.io/cch-batch-extension:${TAG}
+    container_name: cch-batch-extension
+    user: "100000:100000"
+    secrets:
+      - appCert.pfx
+    environment:
+      - KRB5_KTNAME=/keytabs/machine.keytab
+      - KRB5CCNAME=/krb5/krb5cc
+    env_file:
+        - path: ${COMPOSER_FOLDER_LOCATION}/docker_compose/docker-compose.${TARGET_ENV}.env
+          required: true
+    volumes:
+      - keytabs:/keytabs
+      - krb5:/krb5 
+    ports:
+      - ${EXTERNAL_PORT}:8080 #8080 for all 
+
+volumes:
+  keytabs:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "/usr/share/keytabs"
+  krb5:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "/var/credentials-generator/tickets/!${GMSA_ACCOUNT}" #the gMSA account you wish to operate under, this is passed into the process by the Release Pipeline
+
+secrets:
+  appCert.pfx:
+    file: ${CERT_NAME}

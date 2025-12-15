@@ -1,4 +1,6 @@
-﻿namespace CBIZ.CCH.BatchExtension.Application.Shared;
+﻿using System.Text.Json;
+
+namespace CBIZ.CCH.BatchExtension.Application.Shared;
 
 internal static class StringExtensions
 {
@@ -6,5 +8,5 @@ internal static class StringExtensions
     public static string TimeStamp(this string value) => TimeStamp(value, TimeProvider.System);
 
     public static string GuidString(this Guid value) => value.ToString();
-    
+       
 }

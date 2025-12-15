@@ -2,6 +2,8 @@
 
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObjects;
+using Microsoft.Identity.Client.Advanced;
+using Azure.Core;
 
 namespace CBIZ.CCH.BatchExtension.Application.Features.Batches;
 
@@ -52,21 +54,31 @@ public static class BatchExtensionExtensionFunctions
         }
 
     }
-
+    public static List<BatchItemForEmail> ConvertForEmailList(this List<BatchExtensionData> BatchItems)
+        => BatchItems.Select(x => new BatchItemForEmail(
+            x.FirmFlowId,
+            x.TaxReturnId, 
+            x.BatchItemStatus, 
+            x.StatusDescription)
+        ).ToList();
 
     public static List<BatchExtensionData> ConvertToBatchExtensionData(
-        this List<ReturnRequest> returns,
+        this LaunchBatchRunRequest request,
         Guid queueId,
         Guid batchGuid
-        )
+    )
     {
-        return returns.SelectMany(r => r.FirmFlowId.Select(firmFlowId =>
+        return request.Returns.SelectMany(r => r.FirmFlowId.Select(firmFlowId =>
             new BatchExtensionData
             {
                 Id = Guid.Empty,
                 QueueIDGUID = queueId,
                 FirmFlowId = firmFlowId,
                 TaxReturnId = r.ReturnId,
+                ClientName = r.ClientName,
+                ClientNumber = r.ClientNumber,
+                OfficeLocation = r.OfficeLocation,
+                EngagementType = r.EngagementType,
                 BatchId = batchGuid,
                 BatchItemGuid = Guid.Empty,
                 BatchItemStatus = BatchExtensionDataItemStatus.Added.Code,
@@ -74,11 +86,11 @@ public static class BatchExtensionExtensionFunctions
                 FileName = string.Empty,
                 FileDownLoadedFromCCH = false,
                 FileUploadedToGFR = false,
+                GfrDocumentId = string.Empty,
+                CreationDate = DateTime.Now,
                 UpdatedDate = DateTime.Now
         })).ToList();
     }
-
-
 
     public static void UpdateExtensionDataDbFrom(this BatchExtensionData batchFromDb, BatchExtensionData batchUpdated)
     {
@@ -103,4 +115,6 @@ public static class BatchExtensionExtensionFunctions
 
     }
     
+    
+
 }

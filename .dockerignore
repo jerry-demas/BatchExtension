@@ -1,0 +1,26 @@
+# Ignore build output
+**/bin/
+**/obj/
+
+# IDE / tooling files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Git and configuration
+.git/
+.gitignore
+
+# Logs / secrets
+*.log
+*.env
+secrets/
+*.pfx
+*.key
+*.crt
+
+# Test results
+TestResults/
+coverage/

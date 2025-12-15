@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.InternalServices;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure;
+using Cbiz.SharedPackages;
+
 
 namespace CBIZ.CCH.BatchExtension.Application;
 
@@ -16,9 +18,9 @@ public static class ApplicationServiceRegistration
            IConfiguration configuration)
     { 
         builder.Services.Configure<DatabaseOptions>(configuration.GetSection(nameof(DatabaseOptions)));
-        builder.Services.Configure<CCHEndPointOptions>(configuration.GetSection(nameof(CCHEndPointOptions)));
-        builder.Services.Configure<GFREndPointOptions>(configuration.GetSection(nameof(GFREndPointOptions)));
-        builder.Services.Configure<GFRApiAccessInfo>(configuration.GetSection(nameof(GFRApiAccessInfo)));
+        builder.Services.Configure<CchEndPointOptions>(configuration.GetSection(nameof(CchEndPointOptions)));
+        builder.Services.Configure<GfrEndPointOptions>(configuration.GetSection(nameof(GfrEndPointOptions)));
+        builder.Services.Configure<GfrApiAccessInfo>(configuration.GetSection(nameof(GfrApiAccessInfo)));
         builder.Services.Configure<ProcessOptions>(configuration.GetSection(nameof(ProcessOptions)));
         builder.Services.AddDbContext<BatchDbContext>();
         
@@ -36,7 +38,7 @@ public static class ApplicationServiceRegistration
             {
                 UseDefaultCredentials = true // Enables Windows Authentication (NTLM/Kerberos)
             });
-
+        builder.AddAzureKeyVaultAsConfig();
         return builder;
     }
 }

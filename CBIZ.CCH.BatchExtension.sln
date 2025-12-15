@@ -22,6 +22,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CBIZ.CCH.BatchExtension.Pre
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CBIZ.CCH.BatchExtension.API", "CBIZ.CCH.BatchExtension.API\CBIZ.CCH.BatchExtension.API.csproj", "{3B291CC4-428B-4338-9365-11C446A73363}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docker-compose", "docker-compose", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose\docker-compose.dev.env = docker-compose\docker-compose.dev.env
+		docker-compose\docker-compose.prod.env = docker-compose\docker-compose.prod.env
+		docker-compose\docker-compose.uat.env = docker-compose\docker-compose.uat.env
+		docker-compose\docker-compose.yml = docker-compose\docker-compose.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +91,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {F49048DF-1D4D-4146-88B3-19E9619184E2}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DB8B227D-F348-425E-A732-7DA83164BA16}

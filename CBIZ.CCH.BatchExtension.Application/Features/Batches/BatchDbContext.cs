@@ -23,7 +23,6 @@ public class BatchDbContext(
     {
         modelBuilder.ApplyConfiguration(new BatchExtensionMap());
         modelBuilder.ApplyConfiguration(new BatchExtensionQueueMap());
-
     }
     
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

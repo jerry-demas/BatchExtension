@@ -7,7 +7,7 @@ trigger:
       - main
       
 pool:
-  vmImage: 'windows-latest'
+  vmImage: 'ubuntu-22.04'
 
 variables:
 - name: buildName
@@ -33,6 +33,8 @@ stages:
     sonarQubeOrganizationKey: "cbiz-appsdev"
     sonarQubeProjectKey: "CBIZ-AppsDev_CBIZ.CCH.BatchExtension"
     filesToSign:  "*.dll *.exe "
-    buildProjects: "$(Build.SourcesDirectory)/**/CBIZ.CCH.BatchExtension.Presentation.*.csproj"
+    buildProjects: "$(Build.SourcesDirectory)/CBIZ.CCH.BatchExtension.API/CBIZ.CCH.BatchExtension.API.csproj"
     versionNumber: "$(Build.BuildNumber)"
-    
+
+    dockerFile: "Dockerfile"
+    dockerRepositoryName: "cch-batch-extension"    

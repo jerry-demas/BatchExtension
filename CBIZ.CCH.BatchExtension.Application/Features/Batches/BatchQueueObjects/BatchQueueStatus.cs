@@ -2,8 +2,8 @@
 
 public static class BatchQueueStatus
 {
-    public static string Scheduled = "Scheduled";
-    public static string Running = "Running";
-    public static string Completed = "Completed";
-    public static string CompletedWithErrors = "CompletedWithErrors";
+    public const string Scheduled = "Scheduled";
+    public const string Running = "Running";
+    public const string Completed = "Completed";
+    public const string CompletedWithErrors = "CompletedWithErrors";
 }

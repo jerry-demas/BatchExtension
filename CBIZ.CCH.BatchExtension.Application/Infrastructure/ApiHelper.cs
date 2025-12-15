@@ -1,139 +1,146 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Cbiz.SharedPackages;
-using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 
+
+using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 using Microsoft.Extensions.Logging;
+
 
 namespace CBIZ.CCH.BatchExtension.Application.Infrastructure;
 
 public class ApiHelper(
-    IHttpClientFactory httpClientFactory,
+    IHttpClientFactory httpClientFactory,    
     ILogger<ApiHelper> logger)
 {
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<ApiHelper> _logger = logger;
+    
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
-    public async Task<Either<HttpResponseMessage, BatchExtensionException>> ExecuteGetAsync(
+    private HttpClient CreateConfiguredClient(Dictionary<string, string>? headers)
+    {
+        _logger.LogInformation("In CreateConfiguredClient");
+        var client = _httpClientFactory.CreateClient();
+
+        if (headers == null) 
+            return client;
+
+        foreach (var header in headers)
+        {
+            if (header.Key.Equals("Accept", StringComparison.OrdinalIgnoreCase))
+            {
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue(header.Value));
+            }
+            else
+            {
+                client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        return client;
+    }
+
+    private async Task<Either<HttpResponseMessage, BatchExtensionException>> SendAsync(
+        Func<HttpClient, Task<HttpResponseMessage>> sendAction,
+        string url,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("In SendAsync");
+
+        try
+        {
+            using var client = _httpClientFactory.CreateClient();
+            var response = await sendAction(client);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorMessage = await response.Content.ReadAsStringAsync(cancellationToken);
+                return new BatchExtensionException(
+                    $"HTTP {(int)response.StatusCode} - {response.ReasonPhrase}: {errorMessage}");
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending HTTP request to {Url}", url);
+            return new BatchExtensionException($"Error sending HTTP request: {url}", ex);
+        }
+    }
+
+    public Task<Either<HttpResponseMessage, BatchExtensionException>> ExecuteGetAsync(
         string url,
         Dictionary<string, string>? headers = null,
-        CancellationToken cancellationToken = default)
-    {
-        try
+        CancellationToken cancellationToken = default) =>
+        SendAsync(client =>
         {
-            using (var client = _httpClientFactory.CreateClient())
-            {
+            var configuredClient = CreateConfiguredClient(headers);
+            return configuredClient.GetAsync(url, cancellationToken);
+        }, url, cancellationToken);
 
-                if (headers != null)
-                {
-                    foreach (var header in headers)
-                    {
-                        if (header.Key.Equals("Accept", StringComparison.OrdinalIgnoreCase))
-                        {
-                            client.DefaultRequestHeaders.Accept.Add(
-                                new MediaTypeWithQualityHeaderValue(header.Value));
-                        }
-                        else
-                        {
-                            client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
-                        }
-                    }
-                }
-
-                var response = await client.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorMessage = await response.Content.ReadAsStringAsync(cancellationToken);
-                    return new BatchExtensionException(
-                        $"HTTP {(int)response.StatusCode} - {response.ReasonPhrase}: {errorMessage}");
-                }
-                return response;
-            }
-                        
-        }
-        catch (Exception ex)
-        {
-            _logger.LogInformation($"Error in ExecutePostAsync: {url}");
-            return new BatchExtensionException($"Error in ExecutePostAsync: {url}", ex);
-        }
-    }
-
-    public async Task<Either<HttpResponseMessage, BatchExtensionException>> ExecutePostAsync(
+    public Task<Either<HttpResponseMessage, BatchExtensionException>> ExecutePostAsync(
         string url,
         MultipartFormDataContent form,
-        CancellationToken cancellationToken = default)
-    {
-        try
+        Dictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(client => 
         {
-           
-            using (var client = _httpClientFactory.CreateClient())
-            {
-                var response = await client.PostAsync(url, form, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorMessage = await response.Content.ReadAsStringAsync(cancellationToken);                   
-                    return new BatchExtensionException(
-                        $"HTTP {(int)response.StatusCode} - {response.ReasonPhrase}: {errorMessage}");                    
-                
-                }
-                return response;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogInformation($"Error in ExecutePostAsync: {url}");
-            return new BatchExtensionException($"Error in ExecutePostAsync: {url}", ex);
-        }
-    }
-    
-    
-    public async Task<Either<HttpResponseMessage, BatchExtensionException>> ExecutePostAsync(
+            var configuredClient = CreateConfiguredClient(headers);
+            return configuredClient.PostAsync(url, form, cancellationToken);                
+        }, url, cancellationToken);
+        
+
+    public Task<Either<HttpResponseMessage, BatchExtensionException>> ExecutePostAsync(
         string url,
         StringContent content,
         Dictionary<string, string>? headers = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SendAsync(client =>
+        {
+            var configuredClient = CreateConfiguredClient(headers);
+            return configuredClient.PostAsync(url, content, cancellationToken);
+        }, url, cancellationToken);
+
+    public async Task<Either<T, BatchExtensionException>> DeserializeResult<T>(HttpResponseMessage httpResponse)
+
+        where T : notnull
     {
+        _logger.LogInformation("In DeserializeResult");
         try
         {
-            using (var client = _httpClientFactory.CreateClient())
-            {
-                if (headers != null)
-                {
-                    foreach (var header in headers)
-                    {
-                        if (header.Key.Equals("Accept", StringComparison.OrdinalIgnoreCase))
-                        {
-                            client.DefaultRequestHeaders.Accept.Add(
-                                new MediaTypeWithQualityHeaderValue(header.Value));
-                        }
-                        else
-                        {
-                            client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
-                        }
-                    }
-                }
+            _logger.LogInformation("Deserializing HTTP response...");
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<T>(jsonContent, _jsonOptions);
 
-                var response = await client.PostAsync(url, content, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorMessage = await response.Content.ReadAsStringAsync(cancellationToken);
-                    return new BatchExtensionException(
-                        $"HTTP {(int)response.StatusCode} - {response.ReasonPhrase}: {errorMessage}");
-                }
-                return response;
-            }
+            if (result is null)
+                return new BatchExtensionException("Error deserializing HTTP response");
+
+            return result; // wraps automatically in Either<T, BatchExtensionException>
         }
         catch (Exception ex)
         {
-            _logger.LogInformation($"Error in ExecutePostAsync: {url}");
-            return new BatchExtensionException($"Error in ExecutePostAsync: {url}", ex);
+            return new BatchExtensionException($"Error deserializing HTTP response: {ex.Message}");
         }
     }
-    
 
-
- 
+    public static Dictionary<string, string> GetHeader(
+        string token,
+        string appIdKey,
+        string contentType
+    )
+    {       
+        var headers = new Dictionary<string, string>();
+        if (!string.IsNullOrEmpty(token)) headers.Add("Authorization", $"Basic {token}");
+        if (!string.IsNullOrEmpty(appIdKey)) headers.Add("X-TR-API-APP-ID", appIdKey);                 
+        if (!string.IsNullOrEmpty(contentType)) headers.Add("Content-Type", "application/json");
+        
+        return headers;
+    }
 
 }
