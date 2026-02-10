@@ -30,7 +30,6 @@ public static class BatchExtensionExtensionFunctions
         );
     }
 
-
     public static void UpdateBatchItemsGuidAndFileName(this List<BatchExtensionData> batch, List<CreateBatchOutputFilesResponse> response)
     {
         var responseList = response
@@ -111,7 +110,7 @@ public static class BatchExtensionExtensionFunctions
         batchFromDb.QueueStatus = batchUpdated.QueueStatus;
         batchFromDb.BatchStatus = batchUpdated.BatchStatus;
         batchFromDb.SubmittedBy = batchUpdated.SubmittedBy;
-        batchFromDb.SubmittedBy = batchUpdated.SubmittedBy;
+        batchFromDb.SubmittedDate = batchUpdated.SubmittedDate;
 
     }
     

@@ -13,16 +13,18 @@ public class BatchDbContext(
 {
 
     private readonly DatabaseOptions _databaseOptions = databaseOptions.Value;
-
-
+    
     public DbSet<BatchExtensionQueue> BatchQueue{ get; set; }
 
     public DbSet<BatchExtensionData> Batches { get; set; }
+
+    public DbSet<BatchExtensionDeliverableData> Deliverables { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new BatchExtensionMap());
         modelBuilder.ApplyConfiguration(new BatchExtensionQueueMap());
+        modelBuilder.ApplyConfiguration(new BatchExtensionDeliverableDataMap());
     }
     
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

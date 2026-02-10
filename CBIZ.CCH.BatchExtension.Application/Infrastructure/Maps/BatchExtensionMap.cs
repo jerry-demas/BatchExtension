@@ -24,5 +24,6 @@ internal class BatchExtensionMap : IEntityTypeConfiguration<BatchExtensionData>
         builder.Property(b => b.StatusDescription).HasMaxLength(100);
         builder.Property(b => b.FileName).HasMaxLength(100);
         builder.Property(b => b.GfrDocumentId).HasMaxLength(50);
+        builder.Property(b => b.Message).HasMaxLength(200);
     }
 }

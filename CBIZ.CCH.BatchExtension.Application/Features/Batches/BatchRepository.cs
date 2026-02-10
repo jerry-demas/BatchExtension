@@ -40,23 +40,47 @@ public class BatchRepository(
 
     }
 
-    public async Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(int days, CancellationToken cancellationToken = default)
+    public async Task<Either<List<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(int days, CancellationToken cancellationToken = default)
     {
         try
-        {           
+        {                       
             var cutoff = DateTime.UtcNow.AddDays(-days);
-            return await _dbContext.Batches                
+
+            return await _dbContext.BatchQueue
                 .AsNoTracking()
-                .Where(b => b.CreationDate >= cutoff)
-                .OrderByDescending(b => b.CreationDate)
-                .ToListAsync(cancellationToken);
+                .Where(q => q.BatchExtensionData.Any(d => d.CreationDate >= cutoff))
+                .SelectMany(q => q.BatchExtensionData
+                    .Where(d => d.CreationDate >= cutoff)
+                    .Select(d => new BatchExtensionDataWithReturnType
+                    {
+                        Id = d.Id,
+                        QueueIDGUID = d.QueueIDGUID,
+                        FirmFlowId = d.FirmFlowId,
+                        TaxReturnId = d.TaxReturnId,
+                        ReturnType = q.ReturnType,
+                        ClientName = d.ClientName,
+                        ClientNumber = d.ClientNumber,
+                        OfficeLocation = d.OfficeLocation,
+                        EngagementType = d.EngagementType,
+                        BatchId = d.BatchId,
+                        BatchItemGuid = d.BatchItemGuid,
+                        BatchItemStatus = d.BatchItemStatus,
+                        StatusDescription = d.StatusDescription,
+                        FileName = d.FileName,
+                        FileDownLoadedFromCCH = d.FileDownLoadedFromCCH,
+                        FileUploadedToGFR = d.FileUploadedToGFR,
+                        GfrDocumentId = d.GfrDocumentId,
+                        CreationDate = d.CreationDate,
+                        UpdatedDate = d.UpdatedDate
+                    })
+                )
+                .ToListAsync(cancellationToken);            
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred in AddBatchAsync");
             return new BatchExtensionException($"Error getting batch in GetBatchAsync ", ex);
         }
-
     }
 
     public async Task<Possible<BatchExtensionException>> AddBatchAsync(List<BatchExtensionData> batchExtensions, CancellationToken cancellationToken = default)
@@ -107,6 +131,7 @@ public class BatchRepository(
                             FileDownLoadedFromCCH = d.FileDownLoadedFromCCH,
                             FileUploadedToGFR = d.FileUploadedToGFR,
                             GfrDocumentId = d.GfrDocumentId,
+                            Message = d.Message,
                             CreationDate = d.CreationDate,
                             UpdatedDate = d.UpdatedDate
                     }).ToList()))
@@ -114,13 +139,10 @@ public class BatchRepository(
             
             
             if (returnList is null || returnList.Count == 0)
-                return new BatchExtensionException($"No queues found.");
+                return new BatchExtensionException($"No queues found for queueId {queueId}.");
 
             if(!queueId.Equals(Guid.Empty)){
-                returnList = returnList.Where(q => q.QueueId == queueId).ToList();
-                
-                if (returnList.Count == 0)
-                    return new BatchExtensionException($"No queues found for queueId {queueId}.");
+                returnList = returnList.Where(q => q.QueueId == queueId).ToList();            
             }
 
             return returnList;
@@ -229,11 +251,11 @@ public class BatchRepository(
 
 
 
- public async Task<Possible<BatchExtensionException>> UpdateBatchExtensionQueueAsync<T>(
-        Expression<Func<T, bool>> predicate,
-        Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> setProperties,
-        CancellationToken cancellationToken = default)
-        where T : class
+    public async Task<Possible<BatchExtensionException>> UpdateBatchExtensionQueueAsync<T>(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<SetPropertyCalls<T>, SetPropertyCalls<T>>> setProperties,
+            CancellationToken cancellationToken = default)
+            where T : class
     {
         try
         {
@@ -249,6 +271,30 @@ public class BatchRepository(
             return new BatchExtensionException($"Error updating {typeof(T).Name}", ex);
         }
     }
+
+    public async Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(       
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {                        
+            var deliverableReturn = await _dbContext.Deliverables               
+                .AsNoTracking()    
+                .ToListAsync(cancellationToken);
+
+            if (deliverableReturn is null)
+            {
+                return new BatchExtensionException($"Deliverables were not found.");
+            }
+
+            return deliverableReturn;
+
+        } catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in GetExtensionDeliverableAsync");
+            return new BatchExtensionException($"Error getting record in GetExtensionDeliverableAsync ", ex);
+        }
+    }
+
 
 
 

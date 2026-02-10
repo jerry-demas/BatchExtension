@@ -1,9 +1,6 @@
 ﻿using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using Cbiz.SharedPackages;
-
-
 using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +11,9 @@ public class ApiHelper(
     IHttpClientFactory httpClientFactory,    
     ILogger<ApiHelper> logger)
 {
+    public const string TokenTypeBasic = "Basic";
+    public const string TokenTypeBearer = "Bearer";
+
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<ApiHelper> _logger = logger;
     
@@ -52,7 +52,7 @@ public class ApiHelper(
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("In SendAsync");
-
+        
         try
         {
             using var client = _httpClientFactory.CreateClient();
@@ -129,14 +129,15 @@ public class ApiHelper(
         }
     }
 
-    public static Dictionary<string, string> GetHeader(
+    public static Dictionary<string, string> CreateHeader(
         string token,
         string appIdKey,
-        string contentType
+        string contentType,
+        string tokenType
     )
     {       
         var headers = new Dictionary<string, string>();
-        if (!string.IsNullOrEmpty(token)) headers.Add("Authorization", $"Basic {token}");
+        if (!string.IsNullOrEmpty(token)) headers.Add("Authorization", $"{tokenType} {token}");
         if (!string.IsNullOrEmpty(appIdKey)) headers.Add("X-TR-API-APP-ID", appIdKey);                 
         if (!string.IsNullOrEmpty(contentType)) headers.Add("Content-Type", "application/json");
         

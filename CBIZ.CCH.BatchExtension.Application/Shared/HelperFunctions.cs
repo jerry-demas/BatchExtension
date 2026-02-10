@@ -8,6 +8,12 @@ internal static class HelperFunctions
             Directory.CreateDirectory(DirectoryName);
     }
 
+    public static void DeleteFile(string FileName)
+    {
+        if (File.Exists(FileName))
+            File.Delete(FileName); 
+    }  
+
     public static string TaxReturnClientNumber(this string taxReturn)
     {
         if (taxReturn == string.Empty) return string.Empty;
@@ -20,6 +26,5 @@ internal static class HelperFunctions
         if (taxReturn == string.Empty) return string.Empty;
         return new string(taxReturn.TakeWhile(char.IsDigit).ToArray());
     }
- 
-
+     
 }

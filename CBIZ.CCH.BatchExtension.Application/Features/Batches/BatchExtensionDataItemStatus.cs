@@ -12,8 +12,23 @@ public record BatchExtensionDataItemStatus(string Code, string Description)
     public static readonly BatchExtensionDataItemStatus GfrDocumentCreated = new ("gfrDocumentCreated", "GFR Document created");    
     public static readonly BatchExtensionDataItemStatus GfrUploadGood = new("upload", "Uploaded to GFR");
     public static readonly BatchExtensionDataItemStatus GfrUploadError = new("uploadErr", "Error GFR upload");   
+    public static readonly BatchExtensionDataItemStatus GfrDueDateExtendedGood = new ("dueDateExtended", "Due Date Extended");
+    public static readonly BatchExtensionDataItemStatus GfrDueDateExtendedError = new ("dueDateExtendedErr", "Error Due Date Extension");
+
 
     public static IEnumerable<BatchExtensionDataItemStatus> List() =>
-            new[] { Added, StatusGood, StatusBad, CchBatchCreated, CchBatchCreatedError ,CchDownloadGood,CchDownloadError, GfrDocumentCreated, GfrUploadGood, GfrUploadError };
-
+            new[] { 
+                Added, 
+                StatusGood, 
+                StatusBad, 
+                CchBatchCreated, 
+                CchBatchCreatedError,
+                CchDownloadGood,
+                CchDownloadError, 
+                GfrDocumentCreated, 
+                GfrUploadGood, 
+                GfrUploadError, 
+                GfrDueDateExtendedGood, 
+                GfrDueDateExtendedError 
+            };
 }

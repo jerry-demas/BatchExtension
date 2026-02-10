@@ -2,7 +2,7 @@
 
 namespace CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
 
-public record BatchExtensionQueue
+public class BatchExtensionQueue
 {
     public Guid QueueId { get; set; }    
     public string QueueRequest { get; set; } = string.Empty;
@@ -12,6 +12,6 @@ public record BatchExtensionQueue
     public string SubmittedBy { get; set; }  = string.Empty;
     public DateTime SubmittedDate { get; set; } 
 
-     public ICollection<BatchExtensionData> BatchExtensionData { get; init; } = new List<BatchExtensionData>();
+     public ICollection<BatchExtensionData> BatchExtensionData { get; set; } = new List<BatchExtensionData>();
     
 }

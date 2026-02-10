@@ -36,7 +36,8 @@ CREATE TABLE BatchExtensionData(
 	CreationDate DATETIME NOT NULL DEFAULT GETDATE(),
 	UpdatedDate DATETIME,
 	EngagementType VARCHAR(50) NOT NULL,
-	GFRDocumentId VARCHAR(50)
+	GFRDocumentId VARCHAR(50),
+	Message VARCHAR(200)
 )
 END
 

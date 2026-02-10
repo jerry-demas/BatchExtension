@@ -3,10 +3,9 @@ using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 using Cbiz.SharedPackages;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObjects;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.Configuration;
+using System.Runtime.InteropServices;
 
 
 namespace CBIZ.CCH.BatchExtension.Application.Features.Batches;
@@ -19,6 +18,8 @@ public class BatchService(
     private readonly IBatchRepository _batchRepository = batchRepository;
     private readonly ILogger<BatchService> _logger = logger;
     private readonly ProcessOptions _processOptions = processOptions.Value;
+
+    List<BatchExtensionDeliverableData> tracking = new List<BatchExtensionDeliverableData>();
 
     #region BatchExtensionData 
     public Task<Possible<BatchExtensionException>> UpdateBatchItemUploadedToGFR(Guid batchItemGuid, CancellationToken cancellationToken = default)
@@ -37,18 +38,24 @@ public class BatchService(
         => UpdateBatchItemGfrDocumentId(batchItemGuid, BatchExtensionDataItemStatus.GfrDocumentCreated, gfrDocumentId, cancellationToken);
     
     public Task<Possible<BatchExtensionException>> UpdateBatchItemCreateCCHBatchCreated(Guid batchGuid,CancellationToken cancellationToken = default)
-        => UpdateBatchStatus(batchGuid, BatchExtensionDataItemStatus.CchBatchCreated , cancellationToken);
+        => UpdateBatchStatus(batchGuid, BatchExtensionDataItemStatus.CchBatchCreated , string.Empty, cancellationToken);
 
-    public Task<Possible<BatchExtensionException>> UpdateBatchItemCreateCCHBatchFailed(Guid batchGuid,CancellationToken cancellationToken = default)
-        => UpdateBatchItemStatusCCH(batchGuid, BatchExtensionDataItemStatus.CchBatchCreatedError , cancellationToken);
+    public Task<Possible<BatchExtensionException>> UpdateBatchItemCreateCCHBatchFailed(Guid batchGuid, string message, CancellationToken cancellationToken = default)
+        => UpdateBatchStatus(batchGuid, BatchExtensionDataItemStatus.CchBatchCreatedError, message, cancellationToken);
 
     public Task<Possible<BatchExtensionException>> UpdateBatchItemCCHStatusFailed(Guid batchItemGuid ,CancellationToken cancellationToken = default)
         => UpdateBatchItemStatusCCH(batchItemGuid, BatchExtensionDataItemStatus.CchBatchCreatedError, cancellationToken);
 
-    public Task<Possible<BatchExtensionException>> UpdateBatchStatusFailed(Guid batchId, CancellationToken cancellationToken = default)
-        => UpdateBatchStatus(batchId, BatchExtensionDataItemStatus.StatusBad, cancellationToken);
+    public Task<Possible<BatchExtensionException>> UpdateBatchItemDueDateExtendedSuccessfull(Guid batchItemGuid ,CancellationToken cancellationToken = default)
+        => UpdateBatchItemStatus(batchItemGuid, BatchExtensionDataItemStatus.GfrDueDateExtendedGood, cancellationToken);
 
-    public async Task<Either<List<BatchExtensionData>,BatchExtensionException>> GetBatchExtensionData(CancellationToken cancellationToken = default)
+    public Task<Possible<BatchExtensionException>> UpdateBatchItemDueDateExtendedFailed(Guid batchItemGuid ,CancellationToken cancellationToken = default)
+        => UpdateBatchItemStatus(batchItemGuid, BatchExtensionDataItemStatus.GfrDueDateExtendedError, cancellationToken);
+
+    public Task<Possible<BatchExtensionException>> UpdateBatchStatusFailed(Guid batchId, string message, CancellationToken cancellationToken = default)
+        => UpdateBatchStatus(batchId, BatchExtensionDataItemStatus.StatusBad, message, cancellationToken);
+
+    public async Task<Either<List<BatchExtensionDataWithReturnType>,BatchExtensionException>> GetBatchExtensionData(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -61,8 +68,9 @@ public class BatchService(
             return new BatchExtensionException($"Error Getting BatchExtensionData for 30 days ", ex);
         }
     }
-
-
+    
+    public Task<Possible<BatchExtensionException>> UpdateBatchItemsCreateBatchFailed(Guid queueId, string message, CancellationToken cancellationToken = default)
+        => UpdateBatchItemsCreateBatchFailed(queueId, BatchExtensionDataItemStatus.CchBatchCreatedError, message, cancellationToken);
 
     private async Task<Possible<BatchExtensionException>> UpdateBatchItemStatusCCH(Guid batchItemGuid, BatchExtensionDataItemStatus status, CancellationToken cancellationToken = default)
     {
@@ -71,7 +79,7 @@ public class BatchService(
             var rep = await _batchRepository.UpdateBatchExtensionItemAsync<BatchExtensionData>(
                 x => x.BatchItemGuid == batchItemGuid,
                 s => s
-                    .SetProperty(b => b.FileDownLoadedFromCCH, b => status.Code == BatchExtensionDataItemStatus.CchDownloadGood.Code)
+                    //.SetProperty(b => b.FileDownLoadedFromCCH, b => status.Code == BatchExtensionDataItemStatus.CchDownloadGood.Code)
                     .SetProperty(b => b.BatchItemStatus, b => status.Code)
                     .SetProperty(b => b.StatusDescription, b => status.Description)
                     .SetProperty(b => b.UpdatedDate, b => DateTime.Now),
@@ -85,7 +93,10 @@ public class BatchService(
         }
     }
 
-    private async Task<Possible<BatchExtensionException>> UpdateBatchStatus(Guid batchId, BatchExtensionDataItemStatus status, CancellationToken cancellationToken = default)
+    private async Task<Possible<BatchExtensionException>> UpdateBatchStatus(Guid batchId, 
+        BatchExtensionDataItemStatus status, 
+        string message,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -95,6 +106,7 @@ public class BatchService(
                   s => s
                     .SetProperty(b => b.BatchItemStatus, b => status.Code)
                     .SetProperty(b => b.StatusDescription, b => status.Description)
+                    .SetProperty(b => b.Message, b => message)
                     .SetProperty(b => b.UpdatedDate, b => DateTime.Now),
                     cancellationToken);
             return Possible.Completed;
@@ -151,6 +163,49 @@ public class BatchService(
             return new BatchExtensionException($"Error adding to the database in UpdateBatchItemDownloadedFromCCH:batchItemGuid{batchItemGuid} ", ex);
         }
     }
+    
+    private async Task<Possible<BatchExtensionException>> UpdateBatchItemStatus(Guid batchItemGuid, BatchExtensionDataItemStatus status, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var rep = await _batchRepository.UpdateBatchExtensionItemAsync<BatchExtensionData>(
+                x => x.BatchItemGuid == batchItemGuid,
+                s => s
+                    .SetProperty(b => b.BatchItemStatus, b => status.Code)
+                    .SetProperty(b => b.StatusDescription, b => status.Description)
+                    .SetProperty(b => b.UpdatedDate, b => DateTime.Now),
+                cancellationToken);
+            return rep;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in UpdateBatchItemStatus");
+            return new BatchExtensionException($"Error adding to the database in UpdateBatchItemStatus:batchItemGuid{batchItemGuid} ", ex);
+        }
+    }
+    
+    private async Task<Possible<BatchExtensionException>> UpdateBatchItemsCreateBatchFailed(Guid queueIdGuid, BatchExtensionDataItemStatus status, string message, CancellationToken cancellationToken = default)
+    {
+        
+        try
+        {
+            var rep = await _batchRepository.UpdateBatchExtensionItemAsync<BatchExtensionData>(
+                x => x.QueueIDGUID == queueIdGuid,
+                s => s
+                    .SetProperty(b => b.BatchItemStatus, b => status.Code)
+                    .SetProperty(b => b.StatusDescription, b => status.Description)
+                    .SetProperty(b => b.Message, b => message)
+                    .SetProperty(b => b.UpdatedDate, b => DateTime.Now),
+                cancellationToken);
+            return rep;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in UpdateBatchItemStatus");
+            return new BatchExtensionException($"Error adding to the database in UpdateBatchItemsStatus:queueIdGuid{queueIdGuid} ", ex);
+        }
+    }
+    
     #endregion
 
 
@@ -256,4 +311,29 @@ public class BatchService(
     }
     
     #endregion
+    
+    #region BatchExtensionDeliverableData
+    public async Task<Either<List<BatchExtensionDeliverableData>, BatchExtensionException>> GetExtensionDeliverableAsync(CancellationToken cancellationToken = default)
+    {
+
+        if(tracking.Count > 0) return tracking;
+        try
+        {
+            var ret = await _batchRepository.GetExtensionDeliverableAsync(cancellationToken);
+            if (ret.HasFailure)
+            {
+                _logger.LogError(ret.Failure, "Error occurred in GetExtensionDeliverableAsync :{Message}", ret.Failure.Message);
+                return new BatchExtensionException($"Error occurred in GetExtensionDeliverableAsync : {ret.Failure.Message}");
+            }
+            tracking = ret.Value;
+            return tracking;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in GetExtensionDeliverableAsync");
+            return new BatchExtensionException($"Error occurred in GetExtensionDeliverableAsync", ex);
+        }
+    }
+    #endregion
+    
 }

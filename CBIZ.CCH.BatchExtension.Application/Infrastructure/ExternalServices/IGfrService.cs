@@ -12,4 +12,6 @@ namespace CBIZ.CCH.BatchExtension.Application.Infrastructure.ExternalServices;
 public interface IGfrService
 {
     Task<Possible<BatchExtensionException>> UploadDocumentToGfr(GfrDocument gfrDocument, IBatchService batchService, BatchExtensionData document, bool refreshGfrTicket, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateFirmFlowDueDate( List<BatchExtensionDeliverableData> deliverableData, string firmFlowId, CancellationToken cancellationToken = default); 
+    
 }

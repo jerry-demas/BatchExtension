@@ -7,9 +7,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Text.Json;
-
-
-using CBIZ.CCH.BatchExtension.Application.Shared;
+using CBIZ.CCH.BatchExtension.Application.Features.CCH.interfaces;
+using CBIZ.CCH.BatchExtension.Application.Features.CCH;
 
 namespace CBIZ.CCH.BatchExtension.Application.Infrastructure.ExternalServices;
 
@@ -19,6 +18,8 @@ public class CchService : ICchService
     private readonly CchEndPointOptions _cchEndPointsOptions;
     private readonly ProcessOptions _processOptions;   
     private readonly ApiHelper _apiHelper;
+
+    private IOauthTicket  _cchToken = new NullOauthTicket();  
 
     public CchService(
         ILogger<CchService> logger,
@@ -35,6 +36,46 @@ public class CchService : ICchService
     }
 
 
+    private async Task CreateCCHAuthorizationTokenAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if(HasValidToken())
+            {
+                return;
+            }
+            var url = $"{ApiURL(_cchEndPointsOptions.GetCCHAuthorizationToken)}";            
+            var response = await _apiHelper.ExecuteGetAsync(url, null, cancellationToken);
+            if (response.HasFailure)
+            {
+                _logger.LogError(response.Failure,"Error getting CCH Authentication {Failure}", response.Failure);
+                await Task.FromException(new BatchExtensionException("Error getting CCH Authentication"));
+            }
+            var final = await _apiHelper.DeserializeResult<OauthTicket>(response.Value);
+            if (final.HasFailure)
+            {
+                _logger.LogError(final.Failure,"Error getting CCH Authentication {Failure}", final.Failure);
+                await Task.FromException(new BatchExtensionException("Error getting CCH Authentication"));
+            }
+
+            _cchToken = final.Value;
+
+        } catch (Exception ex)
+        {
+            _logger.LogError(ex.Message);
+            throw;
+        }  
+    }
+
+    private bool HasValidToken()
+    {
+        if (string.IsNullOrEmpty(_cchToken.access_token)) return false;
+        if (DateTime.Now >= _cchToken.RefreshedAt) return false;
+
+        return true;
+    }
+
+
     public async Task<Either<string, BatchExtensionException>> CreateBatchAsync(
             string returnType,
             List<string> returnIds,
@@ -45,12 +86,21 @@ public class CchService : ICchService
         {
             if (_processOptions.UseCchMockData) return CchMockData.TestBatchId().ToString();
 
+            await CreateCCHAuthorizationTokenAsync();
+
+            var header = ApiHelper.CreateHeader(
+                token: _cchToken.access_token,
+                appIdKey: string.Empty,
+                contentType: string.Empty,
+                ApiHelper.TokenTypeBearer                
+            );
+
             var url = $"{ApiURL(_cchEndPointsOptions.CreateBatchAPI)}/{returnType}";
             StringContent content = new StringContent(JsonSerializer.Serialize(returnIds), Encoding.UTF8, "application/json");
-            var createResponse = await _apiHelper.ExecutePostAsync(url, content, null, cancellationToken);
+            var createResponse = await _apiHelper.ExecutePostAsync(url, content, header, cancellationToken);
             if (createResponse.HasFailure)
             {
-                return new BatchExtensionException($"Error in CreateBatchAsync: {createResponse.Failure}");
+                return new BatchExtensionException($"Error in CreateBatchAsync: {createResponse.Failure}");                
             }
 
             var final = await _apiHelper.DeserializeResult<CreateBatchResult>(createResponse.Value);
@@ -84,11 +134,21 @@ public class CchService : ICchService
             }
             
             await Task.Delay(BatchStatusTimeDelay(returnsCount), cancellationToken);
+
+            await CreateCCHAuthorizationTokenAsync();
+
+            var header = ApiHelper.CreateHeader(
+                token: _cchToken.access_token,
+                appIdKey: string.Empty,
+                contentType: string.Empty,
+                ApiHelper.TokenTypeBearer
+            );
+
             var url = $"{ApiURL(_cchEndPointsOptions.GetBatchStatusAPI)}/{executionId}";
             int retryAttempts = 0;
             while (retryAttempts < _processOptions.StatusRetryLimit)
             {
-                var statusResponse = await _apiHelper.ExecuteGetAsync(url, null, cancellationToken);
+                var statusResponse = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
                 if (statusResponse.HasFailure)
                 {
                     return new BatchExtensionException($"Error getting status for Execution ID: {executionId}");
@@ -139,7 +199,16 @@ public class CchService : ICchService
             Console.WriteLine(ApiURL(_cchEndPointsOptions.GetBatchOutputFilesAPI));
             var url = $"{ApiURL(_cchEndPointsOptions.GetBatchOutputFilesAPI)}/{executionId}";
 
-            var response = await _apiHelper.ExecuteGetAsync(url, null, cancellationToken);
+            await CreateCCHAuthorizationTokenAsync();
+
+            var header = ApiHelper.CreateHeader(
+                token: _cchToken.access_token,
+                appIdKey: string.Empty,
+                contentType: string.Empty,
+                ApiHelper.TokenTypeBearer
+            );
+
+            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
             if (response.HasFailure)
             {
                 return new BatchExtensionException($"Error creating batch output files for Execution ID : {executionId}", response.Failure);
@@ -175,7 +244,17 @@ public class CchService : ICchService
             if (_processOptions.UseCchMockData) return Possible.Completed; 
 
             var url = $"{ApiURL(_cchEndPointsOptions.BatchOutputDownloadFileAPI)}/{executionId}/{batchGUID}/{fileName}";
-            var response = await _apiHelper.ExecuteGetAsync(url, null, cancellationToken);
+            
+            await CreateCCHAuthorizationTokenAsync();
+
+            var header = ApiHelper.CreateHeader(
+                token: _cchToken.access_token,
+                appIdKey: string.Empty,
+                contentType: string.Empty,
+                "Bearer"
+            );
+
+            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
             if (response.HasFailure)
             {
                 return new BatchExtensionException($"Error downloading file from API: {response.Failure}");

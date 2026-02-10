@@ -1,6 +1,5 @@
 ﻿namespace CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
-
-public record GfrTrackingReportByWorkFlowResponse
+/*public record GfrTrackingReportByWorkFlowResponse
 (
     int TotalRecords,
     string PageNumber,
@@ -22,3 +21,4 @@ public record GfrTrackingReportByWorkFlowResponse
 
         public bool IsEmptyDeliverable => TotalRecords == 0;
 };
+*/

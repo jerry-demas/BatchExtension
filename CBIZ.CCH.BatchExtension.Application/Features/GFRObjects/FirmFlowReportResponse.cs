@@ -42,9 +42,9 @@ public record FirmFlowReportResponse
     string TotalDaysAtStep,
     string DaysBetweenRoutings,
     string TotalDaysInProcess,
-    string folderID,
-    string filingID,
-    string workflowLastUpdated,
+    string FolderID,
+    string FilingID,
+    string LastUpdated,
     List<InformationField> InformationFields,
     List<RoutingSummary> RoutingSummary,
     List<ResponsibleUserOrGroup> ResponsibleUserOrGroups
