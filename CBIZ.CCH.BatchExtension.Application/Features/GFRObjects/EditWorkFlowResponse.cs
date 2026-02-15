@@ -2,9 +2,9 @@
 
 public record EditWorkFlowResponse
 (
-    string FilingId,
+    int FilingId,
     string ErrorComment,
-    string Status,
+    bool Status,
     List<ErrorMessage> ErrorMessage
 );
 

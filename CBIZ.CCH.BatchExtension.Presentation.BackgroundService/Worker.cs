@@ -59,8 +59,7 @@ public sealed class Worker : Microsoft.Extensions.Hosting.BackgroundService
 
         
         while (!stoppingToken.IsCancellationRequested)
-        {
-            //LaunchBatchRunRequest request = await processContext.batchService.GetRequest(, stoppingToken))
+        {           
             try
             {
                 await ProcessQueueAsync(batchQueue, processContext, stoppingToken);
@@ -135,14 +134,6 @@ private async Task HandleQueueItemAsync(
 
         var request = requestResult.Value;
 
-        //test        
-        var batch = request.ConvertToBatchExtensionData(queueId, Guid.Empty).ToList();
-        if ((await AddBatchToDB(processContext.batchRepository, batch, token)).HasFailure)
-        {
-            await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error adding batches to database", token);
-            return;
-        }
-        //
         if ((await UpdateQueueStatusToRunning(processContext.batchService, queueId)).HasFailure)
         {
             await FailQueueAsync(queueItem, processContext.batchService, queueId, $"Updating error status for queue {queueId}", token);
@@ -157,8 +148,7 @@ private async Task HandleQueueItemAsync(
             return;
         }
         var batchGuidId = createBatch.Value;
-        //var batch = request.ConvertToBatchExtensionData(queueId, batchGuidId).ToList();
-
+        var batch = request.ConvertToBatchExtensionData(queueId, batchGuidId).ToList();                
         await ProcessBatchStepsAsync(batch, batchGuidId, queueItem, processContext, token);
     }
     catch (Exception ex)
@@ -177,31 +167,33 @@ private async Task ProcessBatchStepsAsync(
     CancellationToken token)
 {
     var queueId = queueItem.Request.QueueId;
-    /*
+    
     if ((await AddBatchToDB(processContext.batchRepository, batch, token)).HasFailure)
     {
         await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error adding batches to database", token);
         return;
     }
-    */
-    if ((await GetBatchStatus(processContext.cchService, processContext.batchService, queueId, batchGuidId, batch.Count, token)).HasFailure)
+    
+    if ((await GetBatchStatus(processContext.cchService, processContext.batchService, batch, queueId, batchGuidId, batch.Count, token)).HasFailure)
     {
         await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error getting batch status" ,token);
         return;
     }
-
-    if ((await CreateCCHBatchFiles(processContext.cchService, batch, batchGuidId, token)).HasFailure)
-    {        
-        await FailQueueAsync(queueItem, processContext.batchService, queueId,"Error creating batch files", token);        
-        return;
-    }
-    
     if ((await UpdateBatchDataToDB(processContext.batchRepository, batch, batchGuidId, token)).HasFailure)
     {
         await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error updating batch data", token);
         return;
     }
-
+    if ((await CreateCCHBatchFiles(processContext.cchService, batch, batchGuidId, token)).HasFailure)
+    {        
+        await FailQueueAsync(queueItem, processContext.batchService, queueId,"Error creating batch files", token);        
+        return;
+    }    
+    if ((await UpdateBatchDataToDB(processContext.batchRepository, batch, batchGuidId, token)).HasFailure)
+    {
+        await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error updating batch data", token);
+        return;
+    }
     if ((await DownloadCCHFileAndUploadToGFR(processContext.cchService, processContext.batchService, processContext.gfrService, batch, token)).HasFailure)
     {       
         await FailQueueAsync(queueItem, processContext.batchService, queueId, "Error uploading batch file", token);                 
@@ -210,7 +202,6 @@ private async Task ProcessBatchStepsAsync(
         await processContext.batchService.UpdateQueueBatchStatusRanSuccessfull(queueId, token); 
     }
 
-     
 }
 
 private async Task FailQueueAsync(
@@ -278,7 +269,8 @@ private async Task FailQueueAsync(
 
     private static async Task<Either<string, BatchExtensionException>> GetBatchStatus(
             ICchService service,   
-            IBatchService batchService, 
+            IBatchService batchService,
+            List<BatchExtensionData> batch,
             Guid queueId,        
             Guid batchGuidId,
             int batchCount,
@@ -308,6 +300,9 @@ private async Task FailQueueAsync(
             }
         }
 
+        //Call batch servie ntach service to update 
+        batch.UpdateBatchItemsBatchGuidBatchStatus(statusCheckResult.Value.items);
+
         return statusCheckResult.Value.status;
         
     }
@@ -322,7 +317,7 @@ private async Task FailQueueAsync(
         {
             return new BatchExtensionException($"Error getting status for batch {batchGuidId} : {batchCreatOutputFilesResult.Failure.Message}");
         }        
-        batch.UpdateBatchItemsGuidAndFileName(batchCreatOutputFilesResult.Value);
+        batch.UpdateBatchItemsFileNames(batchCreatOutputFilesResult.Value);
         return batch;
     }
     
@@ -340,6 +335,7 @@ private async Task FailQueueAsync(
 
         return Possible.Completed;    
     }
+
 
     private static async Task<Possible<BatchExtensionException>> DownloadCCHFileAndUploadToGFR(
         ICchService cchService,
@@ -387,6 +383,13 @@ private async Task FailQueueAsync(
                     else
                     {
                         await batchService.UpdateBatchItemDueDateExtendedSuccessfull(batchExtensionDataItem.BatchItemGuid, stoppingToken);
+                        var updateRouteResult =  await UpdateRoute(batchExtensionDataItem, gfrService, batchService, stoppingToken);
+                        if(updateRouteResult.HasFailure)
+                        {
+                            errors.Add(new BatchExtensionException($"Issue with updating route BatchItemGuid: {batchExtensionDataItem.BatchItemGuid} FirmFlowId :  {batchExtensionDataItem.FirmFlowId}"));
+                            await batchService.UpdateBatchItemWorkFlowRouteFailed(batchExtensionDataItem.BatchItemGuid, updateRouteResult.Failure.Message, stoppingToken);                  
+                        }
+                        await batchService.UpdateBatchItemWorkFlowRoute(batchExtensionDataItem.BatchItemGuid, stoppingToken);                                      
                     }                    
                 }
                 refreshGfrTicket = false;
@@ -457,7 +460,8 @@ private async Task FailQueueAsync(
 
         var extendFilingIdDueDate = await gfrService.UpdateFirmFlowDueDate(
             extensionDeliverableData.Value,
-            document.FirmFlowId, 
+            batchService,
+            document, 
             stoppingToken);
         if (extendFilingIdDueDate.HasFailure)
         {
@@ -467,11 +471,36 @@ private async Task FailQueueAsync(
     }
 
 
+
+
+
+    private static async Task<Possible<BatchExtensionException>> UpdateRoute(
+        BatchExtensionData document,
+        IGfrService gfrService,
+        IBatchService batchService,
+        CancellationToken stoppingToken)
+    {
+
+        var updateRoute = await gfrService.UpdateWorkFlowRoute(document.FirmFlowId, batchService, stoppingToken);
+        if(updateRoute.HasFailure)
+        {
+            return new BatchExtensionException(
+                $"Error updating route for FirmFlowId {document.FirmFlowId}");   
+        }   
+                
+        await batchService.UpdateBatchItemUploadedToGFR(document.BatchItemGuid, stoppingToken);
+        
+        return Possible.Completed;
+    }
+
+
     private static string ExtractErrorMessages(List<BatchItemStatus> items)
     {
         if (items == null)
-        return string.Empty;
-
+        {
+            return string.Empty;
+        }
+        
         return string.Join(", ",
             items
                 .Where(i => !string.IsNullOrWhiteSpace(i.ResponseDescription))

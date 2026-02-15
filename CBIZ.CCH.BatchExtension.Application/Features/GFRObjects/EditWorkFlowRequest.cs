@@ -1,8 +1,6 @@
-﻿using CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
-
-namespace CBIZ.CCH.BatchExtension.Application;
+﻿namespace CBIZ.CCH.BatchExtension.Application.Features.GFRObjects;
 
 public record EditWorkflowRequest(
     int FilingId,
-    InformationField InformationFields
+    EditWorkFlowDeliverable Deliverable
 );

@@ -40,17 +40,13 @@ public class BatchRepository(
 
     }
 
-    public async Task<Either<List<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(int days, CancellationToken cancellationToken = default)
+    public async Task<Either<List<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(CancellationToken cancellationToken = default)
     {
         try
-        {                       
-            var cutoff = DateTime.UtcNow.AddDays(-days);
-
+        {                                   
             return await _dbContext.BatchQueue
-                .AsNoTracking()
-                .Where(q => q.BatchExtensionData.Any(d => d.CreationDate >= cutoff))
-                .SelectMany(q => q.BatchExtensionData
-                    .Where(d => d.CreationDate >= cutoff)
+                .AsNoTracking()                
+                .SelectMany(q => q.BatchExtensionData                   
                     .Select(d => new BatchExtensionDataWithReturnType
                     {
                         Id = d.Id,

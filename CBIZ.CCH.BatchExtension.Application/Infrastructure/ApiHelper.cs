@@ -3,6 +3,7 @@ using System.Text.Json;
 using Cbiz.SharedPackages;
 using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 
 namespace CBIZ.CCH.BatchExtension.Application.Infrastructure;
@@ -13,6 +14,7 @@ public class ApiHelper(
 {
     public const string TokenTypeBasic = "Basic";
     public const string TokenTypeBearer = "Bearer";
+    public const string ContentTypeAppJson = "application/json";
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<ApiHelper> _logger = logger;
@@ -119,7 +121,9 @@ public class ApiHelper(
             var result = JsonSerializer.Deserialize<T>(jsonContent, _jsonOptions);
 
             if (result is null)
+            {
                 return new BatchExtensionException("Error deserializing HTTP response");
+            }
 
             return result; // wraps automatically in Either<T, BatchExtensionException>
         }

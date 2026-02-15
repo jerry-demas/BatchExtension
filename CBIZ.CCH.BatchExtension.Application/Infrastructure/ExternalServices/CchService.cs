@@ -62,7 +62,7 @@ public class CchService : ICchService
 
         } catch (Exception ex)
         {
-            _logger.LogError(ex.Message);
+            _logger.LogError(ex, "Error occurred in CreateCCHAuthorizationTokenAsync.");
             throw;
         }  
     }
@@ -86,7 +86,7 @@ public class CchService : ICchService
         {
             if (_processOptions.UseCchMockData) return CchMockData.TestBatchId().ToString();
 
-            await CreateCCHAuthorizationTokenAsync();
+            await CreateCCHAuthorizationTokenAsync(cancellationToken);
 
             var header = ApiHelper.CreateHeader(
                 token: _cchToken.access_token,
@@ -199,7 +199,7 @@ public class CchService : ICchService
             Console.WriteLine(ApiURL(_cchEndPointsOptions.GetBatchOutputFilesAPI));
             var url = $"{ApiURL(_cchEndPointsOptions.GetBatchOutputFilesAPI)}/{executionId}";
 
-            await CreateCCHAuthorizationTokenAsync();
+            await CreateCCHAuthorizationTokenAsync(cancellationToken);
 
             var header = ApiHelper.CreateHeader(
                 token: _cchToken.access_token,
@@ -260,8 +260,8 @@ public class CchService : ICchService
                 return new BatchExtensionException($"Error downloading file from API: {response.Failure}");
             }
 
-            HelperFunctions.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), _processOptions.DownloadFilesDirectory));
-            var returnFileName = Path.Combine(Directory.GetCurrentDirectory(), _processOptions.DownloadFilesDirectory, fileName);
+            HelperFunctions.CreateDirectory(_processOptions.DownloadFilesDirectory);
+            var returnFileName = Path.Combine( _processOptions.DownloadFilesDirectory, fileName);
             await using (Stream contentStream = await response.Value.Content.ReadAsStreamAsync(cancellationToken),
                 fileStream = new FileStream(returnFileName,
                 FileMode.Create,

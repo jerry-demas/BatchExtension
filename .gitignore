@@ -289,4 +289,4 @@ MigrationBackup/
 .ionide/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-CBIZ.CCH.BatchExtension.API/DownLoadedFiles/*.pdf
+CBIZ.CCH.BatchExtension.API/data/DownLoadedFiles/*.pdf

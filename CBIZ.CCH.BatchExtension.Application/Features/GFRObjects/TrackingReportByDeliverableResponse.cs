@@ -2,22 +2,20 @@
 
 public record TrackingReportByDeliverableResponse(
     int TotalRecords,
-    int PageNumber,
+    string PageNumber,
     int PageSize,
     int TotalPages,
-    List<FirmFlowReportResponse> FirmFlowReportResponses,
-    List<TrackingReportRoutingSummary> RoutingSummary,
+    List<FirmFlowReportResponse> FirmFlowReportResponse,
     string GetFirmFlowException
 )
 {
     public static readonly TrackingReportByDeliverableResponse Empty =
         new TrackingReportByDeliverableResponse(
             TotalRecords: 0,
-            PageNumber: 0,
+            PageNumber: string.Empty,
             PageSize : 0,
             TotalPages: 0,
-            FirmFlowReportResponses: new List<FirmFlowReportResponse>(),
-            RoutingSummary: new List<TrackingReportRoutingSummary>(),
+            FirmFlowReportResponse: new List<FirmFlowReportResponse>(),
             GetFirmFlowException: string.Empty
         );
 

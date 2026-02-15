@@ -1,3 +1,3 @@
 ﻿namespace CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
 
-public record ErrorMessage(string Name, string Status, string ErrorComment);
+public record ErrorMessage(string Name, bool Status, string ErrorComment);

@@ -1,4 +1,6 @@
-﻿using CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
+﻿using System.Text.Json.Serialization;
+
+using CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
 
 namespace CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
 
@@ -42,8 +44,9 @@ public record FirmFlowReportResponse
     string TotalDaysAtStep,
     string DaysBetweenRoutings,
     string TotalDaysInProcess,
-    string FolderID,
-    string FilingID,
+    string FolderID,    
+    [property: JsonPropertyName("filingID")] string FilingID,
+    string PriorFilingID,
     string LastUpdated,
     List<InformationField> InformationFields,
     List<RoutingSummary> RoutingSummary,

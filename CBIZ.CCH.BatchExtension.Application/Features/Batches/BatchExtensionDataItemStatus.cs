@@ -15,7 +15,9 @@ public record BatchExtensionDataItemStatus(string Code, string Description)
     public static readonly BatchExtensionDataItemStatus GfrDueDateExtendedGood = new ("dueDateExtended", "Due Date Extended");
     public static readonly BatchExtensionDataItemStatus GfrDueDateExtendedError = new ("dueDateExtendedErr", "Error Due Date Extension");
 
-
+    public static readonly BatchExtensionDataItemStatus GfrWorkFlowRouteGood = new ("workFlowRouted", "Workflow Routed");
+    public static readonly BatchExtensionDataItemStatus GfrWorkFlowRouteError = new ("workFlowRoutedErr", "Error Workflow Routed");
+    
     public static IEnumerable<BatchExtensionDataItemStatus> List() =>
             new[] { 
                 Added, 
@@ -29,6 +31,8 @@ public record BatchExtensionDataItemStatus(string Code, string Description)
                 GfrUploadGood, 
                 GfrUploadError, 
                 GfrDueDateExtendedGood, 
-                GfrDueDateExtendedError 
+                GfrDueDateExtendedError,
+                GfrWorkFlowRouteGood,
+                GfrWorkFlowRouteError
             };
 }

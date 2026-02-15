@@ -4,6 +4,7 @@ using Cbiz.SharedPackages;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObjects;
 using CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
+using CBIZ.CCH.BatchExtension.Application.Features.GFRObjects;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.Configuration;
 using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
 
@@ -26,11 +27,8 @@ internal class GfrService : IGfrService
     private readonly ApiHelper _apiHelper;
     private readonly ProcessOptions _processOptions;
 
-    public const string DocumentType = "EXTENSION";
-
     GfrAuthResponse token = GfrAuthResponse.Empty;
-    TrackingReportByDeliverableResponse tracking = TrackingReportByDeliverableResponse.Empty;
-
+    
     public GfrService(
         ILogger<GfrService> logger,
         IOptions<GfrEndPointOptions> gfrEndPointsOptions,
@@ -57,14 +55,15 @@ internal class GfrService : IGfrService
             var header = ApiHelper.CreateHeader(
                 token: string.Empty,
                 appIdKey: _GfrApiAccessInfo.ApiAppId,
-                contentType: "application/json",
+                contentType: ApiHelper.ContentTypeAppJson,
                 ApiHelper.TokenTypeBasic
             );
 
             var url = $"{ApiURL(_gfrEndPointsOptions.Auth)}";
-            var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);                       
-            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);
+            //var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);           
+            var request = new AuthorizationRequest("gfrserviceaccount2@cbiz.com" , "huf%jbXY~@)2V#B");           
+            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
+            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);            
             if (response.HasFailure)
             {
                 _logger.LogError(response.Failure,"Error getting Authentication {Failure}", response.Failure);
@@ -93,7 +92,6 @@ internal class GfrService : IGfrService
 
         await BuildClientAuth(refreshGfrTicket, cancellationToken);
 
-       
         var indexResponse = await GetIndexesByDrawerIdAsync(cancellationToken);
         if (indexResponse.HasFailure)
         {
@@ -127,8 +125,8 @@ internal class GfrService : IGfrService
         }
 
         //Update db with the new documentId
-        await batchService.UpdateBatchItemUpdateGfrDocumentId(document.BatchItemGuid, newDocumentId.Value, cancellationToken);
-        var returnFileName = Path.Combine(Directory.GetCurrentDirectory(), _processOptions.DownloadFilesDirectory, gfrDocument.fileName);
+        await batchService.UpdateBatchItemUpdateGfrDocumentId(document.BatchItemGuid, newDocumentId.Value, cancellationToken);        
+        var returnFileName = Path.Combine( _processOptions.DownloadFilesDirectory,  gfrDocument.fileName);
         var fileBytes = await File.ReadAllBytesAsync(returnFileName, cancellationToken);
         var uploadResponse = await UploadDocumentAsync(
             newDocumentId.Value,
@@ -147,18 +145,85 @@ internal class GfrService : IGfrService
         return Possible.Completed;
         
     }
-    
-    public async Task<Possible<BatchExtensionException>> UpdateFirmFlowDueDate(
-        List<BatchExtensionDeliverableData> deliverableData,
-        string firmFlowId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        _logger.LogInformation("Updating due date for firmflow Id: {ID} in UpdateFirmFlowDueDate", firmFlowId);
-        
-        await GetTrackingReportByWorkflow(cancellationToken);
 
-        DateTime extendedDueDate = GetDeliverableExtensionDate(deliverableData,firmFlowId);
+    
+    public async Task<Possible<BatchExtensionException>> UpdateWorkFlowRoute(
+        string firmFlowId, 
+        IBatchService batchService, 
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Updating route for firmflow Id: {ID} in UpdateWorkFlowRoute", firmFlowId);
+
+        try
+        {
+            await BuildClientAuth(refreshTicket: false, cancellationToken);
+            var header = ApiHelper.CreateHeader(
+                token: token.token,
+                appIdKey: _GfrApiAccessInfo.ApiAppId,
+                contentType: string.Empty,
+                ApiHelper.TokenTypeBasic
+            );
+
+            var url = $"{ApiURL(_gfrEndPointsOptions.RouteWorkFlow)}";
+            var request = new RouteWorkflowRequest(
+                FilingId: new List<string> { firmFlowId },
+                CurrentStep: new List<string> {},
+                Complete: true,
+                NextStep: WorkFlowRouteConstants.NextStep,
+                Priority: WorkFlowRouteConstants.Priority,
+                Status: WorkFlowRouteConstants.Status,
+                RoutingNote: WorkFlowRouteConstants.RoutingNote,
+                AssignedDate: DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss tt"),
+                CompletedDate: DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss tt"),
+                AssignedTo: WorkFlowRouteConstants.AssignedTo,
+                EmailNotify: false);
+
+            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
+            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);      
+            if(response.HasFailure)
+            {
+                _logger.LogError("Error updating route for firmFlowID : {FirmFlow}}", firmFlowId);
+                return new BatchExtensionException($"Error updating route for firmFlowID : {firmFlowId}"); 
+            }
+
+            var final = await _apiHelper.DeserializeResult<RouteWorkflowResponse>(response.Value);
+            if (final.HasFailure)
+            {
+                _logger.LogError("Error getting Work Flow {Failure}", final.Failure);
+                return new BatchExtensionException($"Error updating route for firmFlowID : {firmFlowId}"); 
+            }
+
+            return Possible.Completed;
+    
+
+
+
+
+        } catch (Exception ex)
+        {            
+            _logger.LogError(ex, "Unable to update Work Flow {firmFlowId}", firmFlowId);  
+            return new BatchExtensionException($"Unable to update Work Flow {firmFlowId}", ex);
+        }   
+        
+
+    }
+
+    public async Task<Possible<BatchExtensionException>> UpdateFirmFlowDueDate(
+        List<BatchExtensionDeliverableData> deliverableData, 
+        IBatchService batchService,
+        BatchExtensionData document,        
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Updating due date for firmflow Id: {ID} in UpdateFirmFlowDueDate", document.FirmFlowId);
+        
+        var errors = new List<string>();
+        var processed = new List<string>();
+
+        var tracking  = await GetTrackingReportByDeliverables(document.ClientNumber, cancellationToken);
+        if(tracking.HasFailure)
+        {
+             return new BatchExtensionException($"Error in UpdateFirmFlowDueDate: {tracking.Failure}");  
+        }
 
         var header = ApiHelper.CreateHeader(
             token: token.token,
@@ -167,51 +232,83 @@ internal class GfrService : IGfrService
             ApiHelper.TokenTypeBasic
         );
         var url = $"{ApiURL(_gfrEndPointsOptions.EditWorkFlow)}";
-        var requestBody = new EditWorkflowRequest(
-            int.Parse(firmFlowId),           
-            InformationFields: new InformationField("Internal Due Date", extendedDueDate.ToString("MM/dd/yyyy"))           
-        );
 
-        StringContent content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-        var createResponse = await _apiHelper.ExecutePostAsync(url, content, header, cancellationToken);
-        if (createResponse.HasFailure)
+        var trackingProcess = tracking.Value.FirmFlowReportResponse
+            .Where(x =>             
+                _processOptions.AllowedGfrWorkFlows.Contains(x.Workflow ?? "")
+            )
+            .ToList();
+            
+        foreach (var item in trackingProcess)
         {
-            return new BatchExtensionException($"Error in UpdateFirmFlowDueDate: {createResponse.Failure}");
-        }
-         var final = await _apiHelper.DeserializeResult<EditWorkFlowResponse>(createResponse.Value);
-        if (final.HasFailure)
-        {
-            return new BatchExtensionException($"Create batch UpdateFirmFlowDueDate for FirmFlowId: {firmFlowId}");
-        }
-        return Possible.Completed;
+        
+            var extendedDataResponse = GetDeliverableExtensionDate(deliverableData, item.Deliverables);
+            var requestBody = new EditWorkflowRequest(
+                int.Parse(item.FilingID),           
+                Deliverable: new EditWorkFlowDeliverable(
+                    WorkFlowRouteConstants.Action, 
+                    extendedDataResponse.ExtensionDate.ToString("MM/dd/yyyy"), 
+                    extendedDataResponse.Deliverable
+                )
+            ); 
 
+            StringContent content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, ApiHelper.ContentTypeAppJson);    
+            
+            var createResponse = await _apiHelper.ExecutePostAsync(url, content, header, cancellationToken);
+            if (createResponse.HasFailure)
+            {
+                errors.Add($"Error in UpdateFirmFlowDueDate Getting response for {item.FilingID} : {createResponse.Failure}");
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid);
+                continue;                     
+            }
+            var final = await _apiHelper.DeserializeResult<EditWorkFlowResponse>(createResponse.Value);
+            if (final.HasFailure)
+            {
+                errors.Add($"Error in UpdateFirmFlowDueDate  DeserializeResult for {item.FilingID} : {createResponse.Failure}");
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid);
+                continue;                       
+            }         
+
+            await batchService.UpdateBatchItemDueDateExtendedSuccessfull(document.BatchItemGuid);
+            processed.Add($"{item.FilingID}");
+        }
+        
+        if(errors.Any())
+        {
+            _logger.LogError(
+                "Batch extension failed with {ErrorCount} errors. Errors: {Errors}",
+                errors.Count,
+                errors);                        
+        }
+
+        if (processed.Any())
+        {
+            return Possible.Completed;
+        }
+
+        return new BatchExtensionException($"Updating due dates for FirmFlowId: {errors}");
+        
     }
     
-    private DateTime GetDeliverableExtensionDate(
-        List<BatchExtensionDeliverableData> deliverableData,
-        string firmFlowId)
+    private (DateTime ExtensionDate, string Deliverable)  GetDeliverableExtensionDate(List<BatchExtensionDeliverableData> deliverableData, string Deliverable)
     {
         
-        var firmFlowReport = tracking.FirmFlowReportResponses
-            .FirstOrDefault(_ => firmFlowId.Equals(_.FilingID) &&
-                         !string.IsNullOrEmpty(_.Deliverables));
-
-        if (firmFlowReport is null) return DateTime.MinValue;
+        var deliverableDataFiltered = deliverableData.FirstOrDefault(_ => Deliverable.Equals(_.Deliverable));
         
-        var deliverableDataFiltered = deliverableData
-            .FirstOrDefault(_ => firmFlowReport.Deliverables.Equals(_.Deliverable));
-        
-        if (deliverableDataFiltered is null) return DateTime.MinValue;
+        if (deliverableDataFiltered is null)  
+        {
+            return (DateTime.MinValue, "Deliverable not found");
+        }
 
-        return deliverableDataFiltered.ExtensionDate;
+         return (deliverableDataFiltered.ExtensionDate, deliverableDataFiltered.Deliverable);
 
     }
 
-    private async Task GetTrackingReportByWorkflow(CancellationToken cancellationToken = default)
+    private async Task<Either<TrackingReportByDeliverableResponse, BatchExtensionException>> GetTrackingReportByDeliverables(string clientNumnber, CancellationToken cancellationToken = default)
     {
         
-        if(tracking.IsEmptyDeliverable)
-        {
+        //if(tracking.IsEmptyDeliverable)
+        //{
             _logger.LogInformation("In GetTrackingReportByWorkflow");
             try
             {
@@ -226,38 +323,37 @@ internal class GfrService : IGfrService
             
                 List<IndexItem> indexItem = new()
                 {
-                    new("0000000006", _gfrEndPointsOptions.TaxYear)
+                    new(WorkFlowRouteConstants.ClientNumberIndex, clientNumnber),
+                    new(WorkFlowRouteConstants.TaxYearIndex, DateTime.Now.AddYears(-1).Year.ToString())
                 };
                 
                 var requestBody = new TrackingReportByDeliverableRequest(     
-                    _GfrApiAccessInfo.DrawerId ,"TAX","","false", indexItem);
+                    _GfrApiAccessInfo.DrawerId ,"CORE TAX","","false", indexItem);
 
-                var jsonRequestBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");  
+                var jsonRequestBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, ApiHelper.ContentTypeAppJson);  
 
-                var url = ApiURL(_gfrEndPointsOptions.TrackingReportByWorkflow);
+                var url = ApiURL(_gfrEndPointsOptions.TrackingReportByDeliverable);
                 var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);
                 if (response.HasFailure)
                 {
-                    _logger.LogError(response.Failure,"Error getting TrackingReportByWorkflow {Failure}", response.Failure);
-                    await Task.FromException(new BatchExtensionException($"Unable to get Tracking Report: {response.Failure.Message}"));
-                }
-
+                    _logger.LogError(response.Failure,"Error getting TrackingReportByWorkflow {Failure}", response.Failure);                   
+                    return new BatchExtensionException($"Error in GetTrackingReportByWorkflow: {response.Failure.Message}");
+                }                
                 var final = await _apiHelper.DeserializeResult<TrackingReportByDeliverableResponse>(response.Value);
                 if (final.HasFailure)
                 {
-                    _logger.LogError(response.Failure,"Error getting TrackingReportByWorkflow {Failure}", response.Failure);
-                    await Task.FromException(new BatchExtensionException($"Unable to get Tracking Report: {response.Failure.Message}"));
-                }
-                
-                tracking = final.Value;
+                    _logger.LogError(response.Failure,"Error getting TrackingReportByWorkflow {Failure}", response.Failure);                   
+                    return new BatchExtensionException($"Unable to get Tracking Report: {final.Failure.Message}");
+                }                
+                return final.Value;
 
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex.Message ,"Error getting TrackingReportByWorkflow {Failure}", ex.Message);
-                await Task.FromException(new BatchExtensionException($"Unable to get Tracking Report {ex.Message}"));
+                _logger.LogError(ex.Message ,"Error getting TrackingReportByWorkflow {Failure}", ex.Message);               
+                return new BatchExtensionException($"Unable to get Tracking Report: {ex.Message}");
             }
-        }
+        //}
     }
 
     private async Task<Possible<BatchExtensionException>> UploadDocumentAsync(
@@ -353,7 +449,7 @@ internal class GfrService : IGfrService
         try
         {
             await BuildClientAuth(refreshTicket: false, cancellationToken); 
-             var header = ApiHelper.CreateHeader(
+            var header = ApiHelper.CreateHeader(
                 token: token.token,
                 appIdKey: _GfrApiAccessInfo.ApiAppId,
                 contentType: string.Empty,
@@ -397,7 +493,7 @@ internal class GfrService : IGfrService
             document,       
             indexes
         );
-        var jsonRequestBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");        
+        var jsonRequestBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, ApiHelper.ContentTypeAppJson);        
         var header = ApiHelper.CreateHeader(
             token: token.token,
             appIdKey: _GfrApiAccessInfo.ApiAppId,
@@ -427,5 +523,6 @@ internal class GfrService : IGfrService
     
 
     private string ApiURL(string api) => String.Concat(_gfrEndPointsOptions.Domain, "/", api);
+
 
 }

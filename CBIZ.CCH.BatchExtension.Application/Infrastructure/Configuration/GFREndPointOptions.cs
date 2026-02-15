@@ -10,6 +10,7 @@ public record GfrEndPointOptions
     public required string GetIndexes { get; init; }    
     public required string GetClientsByDrawerId { get; init; }
     public required string UploadDocument { get; init; }    
-    public required string TrackingReportByWorkflow { get; init; }
-    public required string EditWorkFlow {get; init;}    
+    public required string TrackingReportByDeliverable { get; init; }
+    public required string EditWorkFlow {get; init;}
+    public required string RouteWorkFlow {get; init;}
 }

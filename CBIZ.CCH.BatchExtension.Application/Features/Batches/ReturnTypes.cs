@@ -1,4 +1,4 @@
-﻿namespace CBIZ.CCH.BatchExtension.Application;
+﻿namespace CBIZ.CCH.BatchExtension.Application.Features.Batches;
 
 public static class ReturnTypes
 {

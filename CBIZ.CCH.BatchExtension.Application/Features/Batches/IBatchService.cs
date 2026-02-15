@@ -38,9 +38,18 @@ public interface IBatchService
     Task<Possible<BatchExtensionException>> UpdateBatchItemUploadedToGFRFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchStatusFailed(Guid batchId, string message, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemsCreateBatchFailed(Guid queueId, string message, CancellationToken cancellationToken = default);
-    
-    
+            
 
 
-   
+    Task<Possible<BatchExtensionException>> UpdateBatchItemStatusDateExtended(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemStatusDateExtendedFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+
+
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRoute(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
+    
+    
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteUpdated(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteUpdatedFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+
 }

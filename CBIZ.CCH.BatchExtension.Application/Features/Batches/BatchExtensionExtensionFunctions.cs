@@ -30,28 +30,46 @@ public static class BatchExtensionExtensionFunctions
         );
     }
 
-    public static void UpdateBatchItemsGuidAndFileName(this List<BatchExtensionData> batch, List<CreateBatchOutputFilesResponse> response)
+    public static void UpdateBatchItemsBatchGuidBatchStatus(this List<BatchExtensionData> batch, List<BatchItemStatus> items) 
+    {
+        
+
+        var statusResponse = items
+            .Select(x => new
+           {
+               BatchItemGuid = x.ItemGuid,               
+               ReturnId = x.ReturnInfo.ReturnId
+           }).ToList();
+
+        var updateDict = statusResponse.ToDictionary(u => u.ReturnId, u => u);
+        foreach (var batchItem in batch)
+        {
+            if (updateDict.TryGetValue(batchItem.TaxReturnId, out var BatchItemObject))
+            {
+                batchItem.BatchItemGuid = BatchItemObject.BatchItemGuid;                
+            }
+
+        }
+    }
+
+    public static void UpdateBatchItemsFileNames(this List<BatchExtensionData> batch, List<CreateBatchOutputFilesResponse> response)
     {
         var responseList = response
            .Select(x => new
            {
                BatchItemGuid = x.BatchItemGuid,
-               FileName = x.FileName,
-               ReturnId = RegexReplace.FileNameToReturnID().Replace(x.FileName, "$1P:$2:V$3"),
-               Length = x.Length
+               FileName = x.FileName               
            }).ToList();
 
-        var updateDict = responseList.ToDictionary(u => u.ReturnId, u => u);
+        var updateDict = responseList.ToDictionary(u => u.BatchItemGuid, u => u);
         foreach (var batchItem in batch)
         {
-            if (updateDict.TryGetValue(batchItem.TaxReturnId, out var BatchItemObject))
+            if (updateDict.TryGetValue(batchItem.BatchItemGuid, out var BatchItemObject))
             {
                 batchItem.BatchItemGuid = BatchItemObject.BatchItemGuid;
                 batchItem.FileName = BatchItemObject.FileName;
             }
-
         }
-
     }
     public static List<BatchItemForEmail> ConvertForEmailList(this List<BatchExtensionData> BatchItems)
         => BatchItems.Select(x => new BatchItemForEmail(
