@@ -12,10 +12,8 @@ public record GetIndexResponse(string IndexId, string IndexName)
             ["Client Name"] = document.clientName ?? string.Empty,
             ["Client Number"] = document.clientNumber ?? string.Empty,
             ["File Section"] = document.engagementType ?? string.Empty,            
-            ["Document Type"] = document.documentType ?? string.Empty,
-            //["Description"] = record.Description ?? string.Empty,
-            ["Year"] =  document.returnId.TaxReturnYear(),
-            //["Period End"] = record.PeriodEnd ?? string.Empty,
+            ["Document Type"] = document.documentType ?? string.Empty,            
+            ["Year"] =  document.returnId.TaxReturnYear(),            
             ["Document Date"] = DateTime.Now.ToString("MM/dd/yyyy")
         };
 

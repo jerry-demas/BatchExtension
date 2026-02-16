@@ -2,8 +2,7 @@
 
 public record RouteWorkflowRequest
 (
-    List<string> FilingId,
-    List<string> CurrentStep,
+    List<int> FilingId,
     bool Complete,
     string NextStep,
     string Priority,

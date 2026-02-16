@@ -383,7 +383,7 @@ private async Task FailQueueAsync(
                     else
                     {
                         await batchService.UpdateBatchItemDueDateExtendedSuccessfull(batchExtensionDataItem.BatchItemGuid, stoppingToken);
-                        var updateRouteResult =  await UpdateRoute(batchExtensionDataItem, gfrService, batchService, stoppingToken);
+                        var updateRouteResult =  await UpdateRoute(batchExtensionDataItem, gfrService, batchService, stoppingToken);                       
                         if(updateRouteResult.HasFailure)
                         {
                             errors.Add(new BatchExtensionException($"Issue with updating route BatchItemGuid: {batchExtensionDataItem.BatchItemGuid} FirmFlowId :  {batchExtensionDataItem.FirmFlowId}"));
@@ -470,17 +470,12 @@ private async Task FailQueueAsync(
         return Possible.Completed;
     }
 
-
-
-
-
     private static async Task<Possible<BatchExtensionException>> UpdateRoute(
         BatchExtensionData document,
         IGfrService gfrService,
-        IBatchService batchService,
+        IBatchService batchService,               
         CancellationToken stoppingToken)
-    {
-
+{       
         var updateRoute = await gfrService.UpdateWorkFlowRoute(document.FirmFlowId, batchService, stoppingToken);
         if(updateRoute.HasFailure)
         {
