@@ -12,7 +12,9 @@ namespace CBIZ.CCH.BatchExtension.Application.Infrastructure.ExternalServices;
 public interface IGfrService
 {
     Task<Possible<BatchExtensionException>> UploadDocumentToGfr(GfrDocument gfrDocument, IBatchService batchService, BatchExtensionData document, bool refreshGfrTicket, CancellationToken cancellationToken = default);
-    Task<Either<List<FirmFlowReportResponse>,BatchExtensionException>> UpdateFirmFlowDueDate( List<BatchExtensionDeliverableData> deliverableData,  IBatchService batchService, BatchExtensionData document, CancellationToken cancellationToken = default); 
-    Task<Possible<BatchExtensionException>> UpdateWorkFlowRoute(string firmFlowId, IBatchService batchService, CancellationToken cancellationToken = default);
+    Task<Either<List<FirmFlowReportResponse>,BatchExtensionException>> UpdateFirmFlowDueDate( List<BatchExtensionDeliverableData> deliverableData,  IBatchService batchService, BatchExtensionData document, CancellationToken cancellationToken = default);    
+    Task<Possible<BatchExtensionException>> UpdateWorkFlowRouteProcessing(string firmFlowId, IBatchService batchService, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateWorkFlowRouteFailed( string firmFlowId, IBatchService batchService, CancellationToken cancellationToken = default);
     
+ 
 }

@@ -5,6 +5,7 @@ namespace CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObj
 public class BatchExtensionDataWithReturnType : BatchExtensionDataBase
 {
     public string ReturnType { get; set; } = string.Empty;
+    public string SubmittedBy {get; set; } = string.Empty;
     public BatchExtensionQueue? Queue { get; init; }    
 }
 

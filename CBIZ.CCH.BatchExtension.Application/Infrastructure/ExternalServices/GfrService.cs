@@ -61,7 +61,7 @@ internal class GfrService : IGfrService
 
             var url = $"{ApiURL(_gfrEndPointsOptions.Auth)}"; 
 
-            var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);             
+            var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);                                                      
             var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
             var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);            
             if (response.HasFailure)
@@ -88,7 +88,7 @@ internal class GfrService : IGfrService
            bool refreshGfrTicket,
            CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("In UploadDocumentToGfr");
+        _logger.LogDebug("In UploadDocumentToGfr for queueId : {QueueIDGUID} : GfrdocumentId : {GfrDocumentId}",document.QueueIDGUID, document.GfrDocumentId );
 
         await BuildClientAuth(refreshGfrTicket, cancellationToken);
 
@@ -107,11 +107,11 @@ internal class GfrService : IGfrService
             return new BatchExtensionException($"Error getting Gfr clients {clientsResponse.Failure.Message}");  
         }
         
-        var filteredClient = clientsResponse.Value.FirstOrDefault(_ => string.Equals(_.ClientNumber, gfrDocument.clientNumber, StringComparison.OrdinalIgnoreCase));
-        if (filteredClient == null)
+        var filteredClient = clientsResponse.Value.FirstOrDefault(_ => string.Equals(_.ClientNumber, gfrDocument.ClientNumber, StringComparison.OrdinalIgnoreCase));
+        if (filteredClient is null)
         {
-            _logger.LogError( "Error finding client for : {ClientNumber}:{ClientName}", gfrDocument.clientNumber, gfrDocument.clientName);
-            return new BatchExtensionException($"Error finding client for  {gfrDocument.clientNumber}:{gfrDocument.clientName}"); 
+            _logger.LogError( "Error finding client for : {ClientNumber}:{ClientName}", gfrDocument.ClientNumber, gfrDocument.ClientName);
+            return new BatchExtensionException($"Error finding client for  {gfrDocument.ClientNumber}:{gfrDocument.ClientName}"); 
         }
 
         var newDocumentId = await CreateDocumentAsync(indexResponse.Value, gfrDocument, cancellationToken);
@@ -126,12 +126,12 @@ internal class GfrService : IGfrService
 
         //Update db with the new documentId
         await batchService.UpdateBatchItemUpdateGfrDocumentId(document.BatchItemGuid, newDocumentId.Value, cancellationToken);        
-        var returnFileName = Path.Combine( _processOptions.DownloadFilesDirectory,  gfrDocument.fileName);
+        var returnFileName = Path.Combine( _processOptions.DownloadFilesDirectory,  gfrDocument.FileName);
         var fileBytes = await File.ReadAllBytesAsync(returnFileName, cancellationToken);
         var uploadResponse = await UploadDocumentAsync(
             newDocumentId.Value,
             fileBytes,
-            gfrDocument.fileName,
+            gfrDocument.FileName,
             cancellationToken);
         
         HelperFunctions.DeleteFile(returnFileName);
@@ -146,10 +146,46 @@ internal class GfrService : IGfrService
         
     }
 
-    
-    public async Task<Possible<BatchExtensionException>> UpdateWorkFlowRoute(
-        string firmFlowId,         
+        
+    public async Task<Possible<BatchExtensionException>> UpdateWorkFlowRouteFailed(
+        string firmFlowId,            
         IBatchService batchService, 
+        CancellationToken cancellationToken = default)
+    {
+
+        var result = await UpdateWorkFlowRoute(firmFlowId, WorkFlowRouteConstants.NextStepError, cancellationToken );  
+        if (result.HasFailure)
+        {           
+            return result.Failure;  
+        }
+
+        return Possible.Completed;
+    }
+
+    public async Task<Possible<BatchExtensionException>> UpdateWorkFlowRouteProcessing(
+        string firmFlowId,            
+        IBatchService batchService, 
+        CancellationToken cancellationToken = default)
+    {
+        
+       var result = await UpdateWorkFlowRoute(
+            firmFlowId, 
+            WorkFlowRouteConstants.NextStepProcessing,          
+            cancellationToken
+        );
+         
+        if (result.HasFailure)
+        {           
+            return result.Failure;  
+        }
+
+        return Possible.Completed;
+    }
+
+
+    private async Task<Possible<BatchExtensionException>> UpdateWorkFlowRoute(
+        string firmFlowId, 
+        string nextStep,             
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Updating route for firmflow Id: {ID} in UpdateWorkFlowRoute", firmFlowId);
@@ -163,25 +199,32 @@ internal class GfrService : IGfrService
                 contentType: ApiHelper.ContentTypeAppJson,
                 ApiHelper.TokenTypeBasic
             );
-                        
+            
+            var AssignedToID = await GetGfrGroupId(WorkFlowRouteConstants.AssignedTo, cancellationToken);
+            if (AssignedToID.HasFailure)
+            {
+                _logger.LogError("Error: {assignedTo} was not found", WorkFlowRouteConstants.AssignedTo);              
+                return new BatchExtensionException($"Error: {WorkFlowRouteConstants.AssignedTo} was not found"); 
+            }
+
             var url = $"{ApiURL(_gfrEndPointsOptions.RouteWorkFlow)}";            
             var request = new RouteWorkflowRequest(
                 FilingId: new List<int> { int.Parse(firmFlowId) },               
                 Complete: false,
-                NextStep: WorkFlowRouteConstants.NextStep,
+                NextStep: nextStep,
                 Priority: WorkFlowRouteConstants.Priority,
                 Status: WorkFlowRouteConstants.Status,
                 RoutingNote: WorkFlowRouteConstants.RoutingNote,
                 AssignedDate: DateTime.Now.ToString("MM.dd.yyyy hh:mm:ss tt"),
                 CompletedDate: DateTime.Now.ToString("MM.dd.yyyy hh:mm:ss tt"),
-                AssignedTo: WorkFlowRouteConstants.AssignedTo,
+                AssignedTo: AssignedToID.Value,
                 EmailNotify: false);
 
             var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
             var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);      
             if(response.HasFailure)
             {
-                _logger.LogError("Error updating route for firmFlowID : {FirmFlow}}", firmFlowId);
+                _logger.LogError(response.Failure, "Error updating route for firmFlowID : {FirmFlow}: {Message}", firmFlowId, response.Failure.Message);                                     
                 return new BatchExtensionException($"Error updating route for firmFlowID : {firmFlowId}"); 
             }
 
@@ -207,8 +250,7 @@ internal class GfrService : IGfrService
         
 
     }
-
-    public async Task<Either<List<FirmFlowReportResponse>,BatchExtensionException>> UpdateFirmFlowDueDate(
+    public async Task<Either<List<FirmFlowReportResponse>,BatchExtensionException>> UpdateFirmFlowDueDate(   
         List<BatchExtensionDeliverableData> deliverableData, 
         IBatchService batchService,
         BatchExtensionData document,        
@@ -240,9 +282,13 @@ internal class GfrService : IGfrService
             .ToList();
             
         foreach (var item in trackingProcess)
-        {
-        
-            var extendedDataResponse = GetDeliverableExtensionDate(deliverableData, item.Deliverables);
+        {        
+            var extendedDataResponse = GetDeliverableExtensionDate(deliverableData, item.Deliverables);            
+            if(string.IsNullOrEmpty(extendedDataResponse.Jurisdiction))
+            {
+                continue;
+            }
+
             var requestBody = new EditWorkflowRequest(
                 int.Parse(item.FilingID),           
                 Deliverable: new EditWorkFlowDeliverable(
@@ -258,19 +304,20 @@ internal class GfrService : IGfrService
             if (createResponse.HasFailure)
             {
                 errors.Add($"Error in UpdateFirmFlowDueDate Getting response for {item.FilingID} : {createResponse.Failure}");
-                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid);
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, createResponse.Failure.Message, cancellationToken);
                 continue;                     
             }
             var final = await _apiHelper.DeserializeResult<EditWorkFlowResponse>(createResponse.Value);
             if (final.HasFailure)
             {
                 errors.Add($"Error in UpdateFirmFlowDueDate  DeserializeResult for {item.FilingID} : {createResponse.Failure}");
-                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid);
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, final.Failure.Message, cancellationToken);
                 continue;                       
             }         
 
             await batchService.UpdateBatchItemDueDateExtendedSuccessfull(document.BatchItemGuid);
             processed.Add(item.FilingID);
+            
         }
         
         if(errors.Any())
@@ -290,17 +337,73 @@ internal class GfrService : IGfrService
         
     }
     
-    private (DateTime ExtensionDate, string Deliverable)  GetDeliverableExtensionDate(List<BatchExtensionDeliverableData> deliverableData, string Deliverable)
+
+  private async Task<Either<string, BatchExtensionException>> GetGfrGroupId(string assignedToName, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("In Get GfrGroups");
+        try
+        { 
+            await BuildClientAuth(refreshTicket: false, cancellationToken);
+            var header = ApiHelper.CreateHeader(
+                token: token.token,
+                appIdKey: _GfrApiAccessInfo.ApiAppId,
+                contentType: ApiHelper.ContentTypeAppJson,
+                ApiHelper.TokenTypeBasic
+            );
+
+            var url = ApiURL(_gfrEndPointsOptions.AdminGetGroup); 
+            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);             
+            if(response.HasFailure)
+            {
+                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedToName);
+                return new BatchExtensionException($"Unable to get Gfr group for {assignedToName}");                            
+            }
+
+            var final = await _apiHelper.DeserializeResult<List<GfrGroup>>(response.Value);
+            if (final.HasFailure)
+            {
+                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedToName);
+                return new BatchExtensionException($"Unable to get Gfr group for {assignedToName}");    
+            }
+
+            var groupId = final.Value
+                .FirstOrDefault(_ => string.Equals(
+                    assignedToName,
+                    _.Name,
+                    StringComparison.OrdinalIgnoreCase))
+                ?.Id is string id
+                    ? $"G-{id}"
+                    : null;
+            
+            if (string.IsNullOrEmpty(groupId))
+            {
+                _logger.LogError("There is no group under the name {AssignedToName}", assignedToName);
+                return new BatchExtensionException($"There is no group under the name {assignedToName}");    
+            }
+
+            return groupId;
+
+        } catch(Exception ex)
+        {
+            _logger.LogError(ex ,"Unable to get Gfr group");               
+            return new BatchExtensionException($"Unable to get Gfr group: {ex.Message}");            
+        }
+    }
+
+
+
+    private (DateTime ExtensionDate, string Deliverable, string Jurisdiction)  GetDeliverableExtensionDate(
+        List<BatchExtensionDeliverableData> deliverableData, string Deliverable)
     {
         
         var deliverableDataFiltered = deliverableData.FirstOrDefault(_ => Deliverable.Equals(_.Deliverable));
         
         if (deliverableDataFiltered is null)  
         {
-            return (DateTime.MinValue, "Deliverable not found");
+            return (DateTime.MinValue, "Deliverable not found", string.Empty);
         }
 
-         return (deliverableDataFiltered.ExtensionDate, deliverableDataFiltered.Deliverable);
+         return (deliverableDataFiltered.ExtensionDate, deliverableDataFiltered.Deliverable, deliverableDataFiltered.Jurisdiction);
 
     }
 

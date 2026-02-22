@@ -1,11 +1,12 @@
 ﻿namespace CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
 
 public record GfrDocument(
-    string returnId, 
-    string filingId, 
-    string fileName, 
-    string engagementType,
-    string documentType,
-    string clientName,
-    string clientNumber
+    string ReturnId, 
+    string FilingId, 
+    string FileName, 
+    string EngagementType,
+    string DocumentType,
+    string ClientName,
+    string ClientNumber,
+    string Description
     );

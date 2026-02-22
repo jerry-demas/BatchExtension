@@ -3,8 +3,6 @@ using CBIZ.CCH.BatchExtension.Application.Features.Batches;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchQueueObjects;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.InternalServices;
 using CBIZ.CCH.BatchExtension.Presentation.BackgroundService;
-
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CBIZ.CCH.BatchExtension.API.Endpoints;
@@ -86,7 +84,7 @@ public static class BatchEndpoints
                 statusCode: StatusCodes.Status400BadRequest
             );
 
-        if (request.Returns == null || request.Returns.Count == 0)
+        if (request.Returns is null || request.Returns.Count == 0)
             return Results.Problem(
                 detail: "No returns were received",
                 statusCode: StatusCodes.Status400BadRequest
@@ -102,15 +100,16 @@ public static class BatchEndpoints
         {
             var newQueue = new BatchExtensionQueue
             {
-                QueueId = Guid.Empty,               
+                QueueId = Guid.Empty,
                 QueueRequest = JsonSerializer.Serialize(request),
                 QueueStatus = BatchQueueStatus.Scheduled,
                 BatchStatus = BatchRecordStatus.Scheduled.Description,
                 ReturnType = request.ReturnType,
                 SubmittedBy = request.SubmittedBy,
-                SubmittedDate = DateTime.Now
+                SubmittedDate = DateTime.Now,
+                BatchExtensionData = request.ConvertToBatchExtensionData(Guid.Empty, Guid.Empty)
             };
-
+            
             var serviceResponse = await batchService.AddToQueue(newQueue);
             if (serviceResponse.HasFailure)
             {

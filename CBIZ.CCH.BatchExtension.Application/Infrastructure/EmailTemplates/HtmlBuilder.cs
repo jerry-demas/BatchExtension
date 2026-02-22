@@ -29,7 +29,7 @@ public static class HtmlBuilder
     {
         var sb = new StringBuilder();
 
-        if (rows == null || rows.Count == 0)
+        if (rows is null || rows.Count == 0)
             return "<tr></tr>";
 
         foreach (var row in rows)

@@ -77,11 +77,13 @@ public class CchService : ICchService
 
 
     public async Task<Either<string, BatchExtensionException>> CreateBatchAsync(
+            Guid queueId,
             string returnType,
             List<string> returnIds,
             CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("In CreateBatchAsync");
+        _logger.LogDebug("In CreateBatchAsync for queueId: {QueueId}", queueId);
+
         try
         {
             if (_processOptions.UseCchMockData) return CchMockData.TestBatchId().ToString();
@@ -123,8 +125,7 @@ public class CchService : ICchService
            Guid executionId,
            int returnsCount,
            CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("In GetBatchStatusAsync");
+    {       
         try
         {
             

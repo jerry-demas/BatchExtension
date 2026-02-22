@@ -20,6 +20,22 @@ public class BatchRepository(
     private readonly BatchDbContext _dbContext = context;
     private readonly ILogger<BatchRepository> _logger = logger;
 
+    public async Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByQueueId(Guid queueId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (queueId.Equals(Guid.Empty)) return new BatchExtensionException($"QueueId is missing");
+            return await _dbContext.Batches               
+                .Where(_ => queueId.Equals(_.QueueIDGUID))                
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred in GetBatchByQueueIdAsync");
+            return new BatchExtensionException($"Error getting batch in GetBatchByQueueIdAsync ", ex);
+        }
+    }
+
     public async Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchAsync(Guid batchExtensionId, CancellationToken cancellationToken = default)
     {
 
@@ -67,7 +83,8 @@ public class BatchRepository(
                         FileUploadedToGFR = d.FileUploadedToGFR,
                         GfrDocumentId = d.GfrDocumentId,
                         CreationDate = d.CreationDate,
-                        UpdatedDate = d.UpdatedDate
+                        UpdatedDate = d.UpdatedDate,
+                        SubmittedBy = q.SubmittedBy
                     })
                 )
                 .ToListAsync(cancellationToken);            
@@ -150,7 +167,6 @@ public class BatchRepository(
         }
 
     }
-
     public async Task<Possible<BatchExtensionException>> UpdateBatchAsync(List<BatchExtensionData> batchExtensions, Guid batchExtensionId, CancellationToken cancellationToken = default)
     {
         try
@@ -188,8 +204,7 @@ public class BatchRepository(
     {
 
         try
-        {
-
+        {           
             _dbContext.BatchQueue.Add(batchQueue);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return batchQueue.QueueId;
@@ -268,15 +283,20 @@ public class BatchRepository(
         }
     }
 
-    public async Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(       
+    public async Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(
+        string queueReturnType,       
         CancellationToken cancellationToken = default)
     {
         try
-        {                        
-            var deliverableReturn = await _dbContext.Deliverables               
-                .AsNoTracking()    
-                .ToListAsync(cancellationToken);
+        {   
 
+            var query = _dbContext.Deliverables.AsNoTracking();
+            if(queueReturnType == BatchExtensionConstants.TaxReturnTypes.Federal)
+            {
+                query = query.Where(_ => _.Jurisdiction == BatchExtensionConstants.Jurisdiction.Federal);
+            }
+            var deliverableReturn = await query.ToListAsync(cancellationToken);
+                      
             if (deliverableReturn is null)
             {
                 return new BatchExtensionException($"Deliverables were not found.");

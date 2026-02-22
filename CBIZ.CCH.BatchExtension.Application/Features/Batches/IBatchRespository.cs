@@ -19,6 +19,7 @@ public interface IBatchRepository
   Task<Either<BatchExtensionQueue, BatchExtensionException>> GetBatchQueueById(Guid queueItemId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchQueueStatusResponse>, BatchExtensionException>> GetQueueStatus(Guid queueId, CancellationToken cancellationToken = default);
 
+ Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByQueueId(Guid queueId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchAsync(Guid batchExtensionId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(CancellationToken cancellationToken = default);
     
@@ -38,6 +39,6 @@ public interface IBatchRepository
         CancellationToken cancellationToken = default)
         where T : class;
 
-     Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(CancellationToken cancellationToken = default);
+     Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(string queueReturnType, CancellationToken cancellationToken = default);
 
 }

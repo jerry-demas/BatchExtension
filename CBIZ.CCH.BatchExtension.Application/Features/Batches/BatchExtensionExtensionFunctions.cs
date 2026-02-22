@@ -12,7 +12,7 @@ public static class BatchExtensionExtensionFunctions
 
     public static bool ValidateReturnIds(this List<string> returnIds)
     {
-        if (returnIds == null || returnIds.Count == 0)
+        if (returnIds is null || returnIds.Count == 0)
             return false;
 
         var first = returnIds[0];
@@ -28,6 +28,10 @@ public static class BatchExtensionExtensionFunctions
             s.Substring(0, 4) == targetYear &&
             s[4] == targetType
         );
+    }
+    public static void UpdateBatchItemsBatchId(this List<BatchExtensionData> batch, Guid batchGuidId)    
+    {            
+        batch.ForEach(_ => _.BatchId = batchGuidId);
     }
 
     public static void UpdateBatchItemsBatchGuidBatchStatus(this List<BatchExtensionData> batch, List<BatchItemStatus> items) 

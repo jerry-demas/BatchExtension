@@ -16,7 +16,9 @@ services:
       - krb5:/krb5 
     ports:
       - ${EXTERNAL_PORT}:8080 #8080 for all 
-
+    labels:
+      io.portainer.accesscontrol.public: "true"
+      
 volumes:
   keytabs:
     driver: local

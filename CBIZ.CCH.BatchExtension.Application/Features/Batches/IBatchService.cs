@@ -17,32 +17,34 @@ public interface IBatchService
     Task<Possible<BatchExtensionException>> UpdateQueueStatusToCompleteWithErrors(Guid queueId, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateQueueBatchStatusCCHBatchFail(Guid queueId, CancellationToken cancellationToken = default);
 
-    Task<Possible<BatchExtensionException>> UpdateBatchItemCCHStatusFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemCCHStatusFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
 
     Task<Possible<BatchExtensionException>> UpdateQueueBatchStatusRanSuccessfull(Guid queueId, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateQueueBatchStatusRanError(Guid queueId, CancellationToken cancellationToken = default);
 
     Task<Possible<BatchExtensionException>> UpdateBatchItemDueDateExtendedSuccessfull(Guid batchItemGuid ,CancellationToken cancellationToken = default);
-    Task<Possible<BatchExtensionException>> UpdateBatchItemDueDateExtendedFailed(Guid batchItemGuid ,CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemDueDateExtendedFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
 
     Task<Either<List<BatchExtensionDataWithReturnType>,BatchExtensionException>> GetBatchExtensionData(CancellationToken cancellationToken = default);
 
-    Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(CancellationToken cancellationToken = default);
+    Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByQueueId(Guid queueId, CancellationToken cancellationToken = default);
+
+    Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(string queueReturnType,CancellationToken cancellationToken = default);
 
     Task<Possible<BatchExtensionException>> UpdateBatchItemCreateCCHBatchCreated(Guid batchGuid, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemCreateCCHBatchFailed(Guid batchGuid, string message, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemDownloadedFromCCH(Guid batchItemGuid, CancellationToken cancellationToken = default);
-    Task<Possible<BatchExtensionException>> UpdateBatchItemDownloadedFromCCHFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemDownloadedFromCCHFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemUploadedToGFR(Guid batchItemGuid, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemUpdateGfrDocumentId(Guid batchItemGuid, string gfrDocumentId, CancellationToken cancellationToken = default);
-    Task<Possible<BatchExtensionException>> UpdateBatchItemUploadedToGFRFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemUploadedToGFRFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchStatusFailed(Guid batchId, string message, CancellationToken cancellationToken = default);
     Task<Possible<BatchExtensionException>> UpdateBatchItemsCreateBatchFailed(Guid queueId, string message, CancellationToken cancellationToken = default);
             
 
 
     Task<Possible<BatchExtensionException>> UpdateBatchItemStatusDateExtended(Guid batchItemGuid, CancellationToken cancellationToken = default);
-    Task<Possible<BatchExtensionException>> UpdateBatchItemStatusDateExtendedFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemStatusDateExtendedFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
 
 
     Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRoute(Guid batchItemGuid, CancellationToken cancellationToken = default);
@@ -50,6 +52,8 @@ public interface IBatchService
     
     
     Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteUpdated(Guid batchItemGuid, CancellationToken cancellationToken = default);
-    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteUpdatedFailed(Guid batchItemGuid, CancellationToken cancellationToken = default);
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteUpdatedFailed(Guid batchItemGuid, string message, CancellationToken cancellationToken = default);
+
+    Task<Possible<BatchExtensionException>> UpdateBatchItemWorkFlowRouteFailedByBatchExtensionId(Guid batchExtensionId, CancellationToken cancellationToken = default);
 
 }

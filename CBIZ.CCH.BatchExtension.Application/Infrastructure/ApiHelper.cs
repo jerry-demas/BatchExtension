@@ -29,7 +29,7 @@ public class ApiHelper(
         _logger.LogInformation("In CreateConfiguredClient");
         var client = _httpClientFactory.CreateClient();
 
-        if (headers == null) 
+        if (headers is null) 
             return client;
 
         foreach (var header in headers)

@@ -13,4 +13,5 @@ public record GfrEndPointOptions
     public required string TrackingReportByDeliverable { get; init; }
     public required string EditWorkFlow {get; init;}
     public required string RouteWorkFlow {get; init;}
+    public required string AdminGetGroup {get; init;}
 }
