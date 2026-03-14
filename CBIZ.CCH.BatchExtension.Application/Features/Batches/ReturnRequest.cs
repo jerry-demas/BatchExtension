@@ -3,6 +3,7 @@
 public record ReturnRequest(
     string[] FirmFlowId, 
     string ReturnId, 
+    string Pic,
     string EngagementType,
     string ClientName, 
     string ClientNumber, 

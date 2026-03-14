@@ -1,5 +1,4 @@
-﻿
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 
 using Cbiz.SharedPackages;
 
@@ -13,15 +12,25 @@ namespace CBIZ.CCH.BatchExtension.Application.Features.Batches;
 
 public interface IBatchRepository
 {
-
-
   Task<Either<Guid, BatchExtensionException>> AddToBatchQueue(BatchExtensionQueue batchQueue, CancellationToken cancellationToken = default);
   Task<Either<BatchExtensionQueue, BatchExtensionException>> GetBatchQueueById(Guid queueItemId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchQueueStatusResponse>, BatchExtensionException>> GetQueueStatus(Guid queueId, CancellationToken cancellationToken = default);
 
- Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByQueueId(Guid queueId, CancellationToken cancellationToken = default);
+  Task<Either<LaunchBatchRunRequest, BatchExtensionException>> GetLaunchBatchRequestByqueueId(Guid queueId, CancellationToken cancellationToken = default);
+  Task<Either<List<Guid>, BatchExtensionException>> GetScheduledBatchQueueIds(CancellationToken cancellationToken = default);
+
+  Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchExtensionDataByQueueId(Guid queueId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchExtensionData>, BatchExtensionException>> GetBatchAsync(Guid batchExtensionId, CancellationToken cancellationToken = default);
   Task<Either<List<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataByDaysAsync(CancellationToken cancellationToken = default);
+
+  Task<Either<PagedResult<BatchExtensionDataWithReturnType>, BatchExtensionException>> GetBatchExtensionDataPagedAsync(
+        int page,
+        int pageSize,
+        string[]? filterField = null,
+        string[]? filterValue = null,
+        string? sortField = null,
+        bool sortDescending = false,
+        CancellationToken cancellationToken = default);
     
   Task<Possible<BatchExtensionException>> AddBatchAsync(List<BatchExtensionData> batchExtensions, CancellationToken cancellationToken = default);
   Task<Possible<BatchExtensionException>> UpdateBatchAsync(List<BatchExtensionData> batchExtensions, Guid batchExtensionId, CancellationToken cancellationToken = default);
@@ -39,6 +48,5 @@ public interface IBatchRepository
         CancellationToken cancellationToken = default)
         where T : class;
 
-     Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(string queueReturnType, CancellationToken cancellationToken = default);
-
+     Task<Either<List<BatchExtensionDeliverableData>,BatchExtensionException>> GetExtensionDeliverableAsync(string queueReturnType, CancellationToken cancellationToken = default);            
 }

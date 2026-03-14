@@ -42,7 +42,10 @@ public static class BatchExtensionExtensionFunctions
             .Select(x => new
            {
                BatchItemGuid = x.ItemGuid,               
-               ReturnId = x.ReturnInfo.ReturnId
+               ReturnId = x.ReturnInfo.ReturnId,
+               Message = x.ResponseDescription,
+               StatusDescription = x.ItemStatusDescription
+
            }).ToList();
 
         var updateDict = statusResponse.ToDictionary(u => u.ReturnId, u => u);
@@ -50,7 +53,13 @@ public static class BatchExtensionExtensionFunctions
         {
             if (updateDict.TryGetValue(batchItem.TaxReturnId, out var BatchItemObject))
             {
-                batchItem.BatchItemGuid = BatchItemObject.BatchItemGuid;                
+                batchItem.BatchItemGuid = BatchItemObject.BatchItemGuid; 
+                if (BatchItemObject.StatusDescription == BatchRecordStatus.Exception.Description)
+                {
+                    batchItem.Message = BatchItemObject.Message;
+                    batchItem.BatchItemStatus = BatchExtensionDataItemStatus.CchBatchCreatedError.Code;
+                    batchItem.StatusDescription = BatchExtensionDataItemStatus.CchBatchCreatedError.Description;
+                }
             }
 
         }
@@ -80,27 +89,24 @@ public static class BatchExtensionExtensionFunctions
             x.FirmFlowId,
             x.TaxReturnId, 
             x.BatchItemStatus, 
-            x.StatusDescription)
+            x.StatusDescription,
+            x.Message)
         ).ToList();
 
     public static List<BatchExtensionData> ConvertToBatchExtensionData(
-        this LaunchBatchRunRequest request,
-        Guid queueId,
-        Guid batchGuid
+        this LaunchBatchRunRequest request
     )
     {
         return request.Returns.SelectMany(r => r.FirmFlowId.Select(firmFlowId =>
             new BatchExtensionData
-            {
-                Id = Guid.Empty,
-                QueueIDGUID = queueId,
+            {                          
                 FirmFlowId = firmFlowId,
                 TaxReturnId = r.ReturnId,
+                Pic = r.Pic ?? "",
                 ClientName = r.ClientName,
                 ClientNumber = r.ClientNumber,
                 OfficeLocation = r.OfficeLocation,
-                EngagementType = r.EngagementType,
-                BatchId = batchGuid,
+                EngagementType = r.EngagementType,                
                 BatchItemGuid = Guid.Empty,
                 BatchItemStatus = BatchExtensionDataItemStatus.Added.Code,
                 StatusDescription = BatchExtensionDataItemStatus.Added.Description,

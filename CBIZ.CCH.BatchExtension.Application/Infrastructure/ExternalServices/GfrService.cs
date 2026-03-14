@@ -5,13 +5,11 @@ using CBIZ.CCH.BatchExtension.Application.Features.Batches;
 using CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObjects;
 using CBIZ.CCH.BatchExtension.Application.Features.GfrObjects;
 using CBIZ.CCH.BatchExtension.Application.Features.GFRObjects;
+using CBIZ.CCH.BatchExtension.Application.Infrastructure.Api;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.Configuration;
 using CBIZ.CCH.BatchExtension.Application.Shared.Errors;
-
-using Microsoft.EntityFrameworkCore.Update.Internal;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
 using System.Text;
 using System.Text.Json;
 
@@ -61,15 +59,20 @@ internal class GfrService : IGfrService
 
             var url = $"{ApiURL(_gfrEndPointsOptions.Auth)}"; 
 
-            var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);                                                      
-            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
-            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);            
+            var request = new AuthorizationRequest(_GfrApiAccessInfo.UserName, _GfrApiAccessInfo.Password);            
+            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);            
+            var response = await _apiHelper.ExecuteContentPostAsync(
+                new GenerateTokenRequest(
+                    url: url,                    
+                    content: jsonRequestBody,
+                    headers: header,
+                    cancellationToken: cancellationToken));            
             if (response.HasFailure)
             {
                 _logger.LogError(response.Failure,"Error getting Authentication {Failure}", response.Failure);
                 await Task.FromException(new BatchExtensionException("Error getting Authentication"));
             }
-            var final = await _apiHelper.DeserializeResult<GfrAuthResponse>(response.Value);
+            var final = await _apiHelper.DeserializeResult<GfrAuthResponse>(response.Value, isSensitive: true);
             if (final.HasFailure)
             {
                 _logger.LogError(final.Failure,"Error getting Authentication {Failure}", final.Failure);
@@ -87,16 +90,16 @@ internal class GfrService : IGfrService
            BatchExtensionData document,
            bool refreshGfrTicket,
            CancellationToken cancellationToken = default)
-    {
-        _logger.LogDebug("In UploadDocumentToGfr for queueId : {QueueIDGUID} : GfrdocumentId : {GfrDocumentId}",document.QueueIDGUID, document.GfrDocumentId );
+    {         
+        _logger.LogInformation("In UploadDocumentToGfr for queueId : {QueueIDGUID} : GfrdocumentId : {GfrDocumentId}",document.QueueIDGUID, document.GfrDocumentId );
 
         await BuildClientAuth(refreshGfrTicket, cancellationToken);
 
         var indexResponse = await GetIndexesByDrawerIdAsync(cancellationToken);
         if (indexResponse.HasFailure)
         {
-            _logger.LogError(indexResponse.Failure, "Error getting Indexes :{Message}", indexResponse.Failure.Message);
-            return new BatchExtensionException($"Error getting Indexes :{indexResponse.Failure.Message}");
+            _logger.LogError(indexResponse.Failure, "Error getting Indexes :{Message}", indexResponse.Failure.Message);            
+            return indexResponse.Failure;
         }
 
         
@@ -104,7 +107,7 @@ internal class GfrService : IGfrService
         if(clientsResponse.HasFailure)
         {
             _logger.LogError(clientsResponse.Failure, "Error getting Gfr clients : {Message}", clientsResponse.Failure.Message);
-            return new BatchExtensionException($"Error getting Gfr clients {clientsResponse.Failure.Message}");  
+            return new BatchExtensionException($"Error getting Gfr clients {clientsResponse.Failure.Message}");         
         }
         
         var filteredClient = clientsResponse.Value.FirstOrDefault(_ => string.Equals(_.ClientNumber, gfrDocument.ClientNumber, StringComparison.OrdinalIgnoreCase));
@@ -117,8 +120,8 @@ internal class GfrService : IGfrService
         var newDocumentId = await CreateDocumentAsync(indexResponse.Value, gfrDocument, cancellationToken);
         if (newDocumentId.HasFailure)
         {
-            _logger.LogError(indexResponse.Failure, "Error getting Indexes :{Message}", indexResponse.Failure.Message);
-            return new BatchExtensionException($"Error creating GFR document {newDocumentId.Failure.Message}");
+            _logger.LogError(indexResponse.Failure, "Error creating GFR document:{Message}", indexResponse.Failure.Message);
+            return newDocumentId.Failure;
         } else if (string.IsNullOrWhiteSpace(newDocumentId.Value)){
             _logger.LogError("Error getting Indexes: newDocumentId is blank");
             return new BatchExtensionException($"Error getting Indexes: newDocumentId is blank");
@@ -138,8 +141,8 @@ internal class GfrService : IGfrService
         
         if(uploadResponse.HasFailure)
         {
-             _logger.LogError(indexResponse.Failure, "Error Uploading GFR document {Message}", uploadResponse.Failure.Message);
-            return new BatchExtensionException($"Error Uploading GFR document {uploadResponse.Failure.Message}");
+             _logger.LogError(indexResponse.Failure, "Error Uploading GFR document {Message}", uploadResponse.Failure.Message);            
+            return uploadResponse.Failure;
         }
 
         return Possible.Completed;
@@ -153,7 +156,11 @@ internal class GfrService : IGfrService
         CancellationToken cancellationToken = default)
     {
 
-        var result = await UpdateWorkFlowRoute(firmFlowId, WorkFlowRouteConstants.NextStepError, cancellationToken );  
+        var result = await UpdateWorkFlowRoute(
+            firmFlowId, 
+            WorkFlowRouteConstants.NextStepError, 
+            cancellationToken);  
+        
         if (result.HasFailure)
         {           
             return result.Failure;  
@@ -182,6 +189,15 @@ internal class GfrService : IGfrService
         return Possible.Completed;
     }
 
+    private static WorkFlowRouteConstants.RouteAssignedTo GetAssignedToGroup(string nextStep)
+    {        
+        return nextStep switch
+        {
+            WorkFlowRouteConstants.NextStepProcessing => WorkFlowRouteConstants.RouteAssignedTo.AssignedToGood,
+            WorkFlowRouteConstants.NextStepError => WorkFlowRouteConstants.RouteAssignedTo.AssignedToFailed,               
+            _ => WorkFlowRouteConstants.RouteAssignedTo.AssignedToFailed
+        };       
+    }
 
     private async Task<Possible<BatchExtensionException>> UpdateWorkFlowRoute(
         string firmFlowId, 
@@ -200,11 +216,16 @@ internal class GfrService : IGfrService
                 ApiHelper.TokenTypeBasic
             );
             
-            var AssignedToID = await GetGfrGroupId(WorkFlowRouteConstants.AssignedTo, cancellationToken);
+            var assignedGroup = GetAssignedToGroup(nextStep);            
+            var AssignedToID = await GetGfrGroupId(
+                assignedGroup, 
+                cancellationToken
+                );
+
             if (AssignedToID.HasFailure)
             {
-                _logger.LogError("Error: {assignedTo} was not found", WorkFlowRouteConstants.AssignedTo);              
-                return new BatchExtensionException($"Error: {WorkFlowRouteConstants.AssignedTo} was not found"); 
+                _logger.LogError("Error: {AssignedTo} was not found", assignedGroup.AssignedToName);              
+                return new BatchExtensionException($"Error: {assignedGroup.AssignedToName} was not found"); 
             }
 
             var url = $"{ApiURL(_gfrEndPointsOptions.RouteWorkFlow)}";            
@@ -220,18 +241,24 @@ internal class GfrService : IGfrService
                 AssignedTo: AssignedToID.Value,
                 EmailNotify: false);
 
-            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);
-            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);      
+            var jsonRequestBody = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, ApiHelper.ContentTypeAppJson);            
+            var response = await _apiHelper.ExecuteContentPostAsync(
+                new GenerateRequest(
+                    url: url,                    
+                    content: jsonRequestBody, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));      
             if(response.HasFailure)
             {
                 _logger.LogError(response.Failure, "Error updating route for firmFlowID : {FirmFlow}: {Message}", firmFlowId, response.Failure.Message);                                     
-                return new BatchExtensionException($"Error updating route for firmFlowID : {firmFlowId}"); 
+                return response.Failure; 
+                 
             }
 
             var final = await _apiHelper.DeserializeResult<RouteWorkflowResponse>(response.Value);
             if (final.HasFailure)
             {
-                _logger.LogError("Error getting Work Flow {Failure}", final.Failure);
+                _logger.LogError(final.Failure, "Error Deserializing UpdateWorkFlowRoute {Failure}", final.Failure.Message);
                 return new BatchExtensionException($"Error updating route for firmFlowID : {firmFlowId}"); 
             }
 
@@ -299,19 +326,25 @@ internal class GfrService : IGfrService
             ); 
 
             StringContent content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, ApiHelper.ContentTypeAppJson);    
+                        
+            var createResponse = await _apiHelper.ExecuteContentPostAsync(
+                new GenerateRequest(
+                    url: url,                  
+                    content: content, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             
-            var createResponse = await _apiHelper.ExecutePostAsync(url, content, header, cancellationToken);
             if (createResponse.HasFailure)
             {
                 errors.Add($"Error in UpdateFirmFlowDueDate Getting response for {item.FilingID} : {createResponse.Failure}");
-                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, createResponse.Failure.Message, cancellationToken);
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, createResponse.Failure, cancellationToken);
                 continue;                     
             }
             var final = await _apiHelper.DeserializeResult<EditWorkFlowResponse>(createResponse.Value);
             if (final.HasFailure)
             {
                 errors.Add($"Error in UpdateFirmFlowDueDate  DeserializeResult for {item.FilingID} : {createResponse.Failure}");
-                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, final.Failure.Message, cancellationToken);
+                await batchService.UpdateBatchItemDueDateExtendedFailed(document.BatchItemGuid, final.Failure, cancellationToken);
                 continue;                       
             }         
 
@@ -338,7 +371,7 @@ internal class GfrService : IGfrService
     }
     
 
-  private async Task<Either<string, BatchExtensionException>> GetGfrGroupId(string assignedToName, CancellationToken cancellationToken = default)
+  private async Task<Either<string, BatchExtensionException>> GetGfrGroupId(WorkFlowRouteConstants.RouteAssignedTo assignedTo, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("In Get GfrGroups");
         try
@@ -351,34 +384,38 @@ internal class GfrService : IGfrService
                 ApiHelper.TokenTypeBasic
             );
 
-            var url = ApiURL(_gfrEndPointsOptions.AdminGetGroup); 
-            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);             
+            var url = ApiURL(_gfrEndPointsOptions.AdminGetGroup);                      
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateRequest(
+                    url: url, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));             
             if(response.HasFailure)
             {
-                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedToName);
-                return new BatchExtensionException($"Unable to get Gfr group for {assignedToName}");                            
+                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedTo.AssignedToName);
+                return new BatchExtensionException($"Unable to get Gfr group for {assignedTo.AssignedToName}");                            
             }
 
             var final = await _apiHelper.DeserializeResult<List<GfrGroup>>(response.Value);
             if (final.HasFailure)
             {
-                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedToName);
-                return new BatchExtensionException($"Unable to get Gfr group for {assignedToName}");    
+                _logger.LogError("Unable to get Gfr group for : {AssignedToName}", assignedTo.AssignedToName);
+                return new BatchExtensionException($"Unable to get Gfr group for {assignedTo.AssignedToName}");    
             }
 
             var groupId = final.Value
                 .FirstOrDefault(_ => string.Equals(
-                    assignedToName,
+                    assignedTo.AssignedToName,
                     _.Name,
                     StringComparison.OrdinalIgnoreCase))
                 ?.Id is string id
-                    ? $"G-{id}"
+                    ? $"{assignedTo.AssignedToCode}-{id}"
                     : null;
             
             if (string.IsNullOrEmpty(groupId))
             {
-                _logger.LogError("There is no group under the name {AssignedToName}", assignedToName);
-                return new BatchExtensionException($"There is no group under the name {assignedToName}");    
+                _logger.LogError("There is no group under the name {AssignedToName}", assignedTo.AssignedToName);
+                return new BatchExtensionException($"There is no group under the name {assignedTo.AssignedToName}");    
             }
 
             return groupId;
@@ -433,8 +470,14 @@ internal class GfrService : IGfrService
 
             var jsonRequestBody = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, ApiHelper.ContentTypeAppJson);  
 
-            var url = ApiURL(_gfrEndPointsOptions.TrackingReportByDeliverable);
-            var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);
+            var url = ApiURL(_gfrEndPointsOptions.TrackingReportByDeliverable);            
+            var response = await _apiHelper.ExecuteContentPostAsync(
+                new GenerateRequest(
+                    url: url, 
+                    form: null, 
+                    content: jsonRequestBody, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
                 _logger.LogError(response.Failure,"Error getting TrackingReportByWorkflow {Failure}", response.Failure);                   
@@ -480,14 +523,19 @@ internal class GfrService : IGfrService
 
         int retryAttempts = 0;
         while (retryAttempts < _processOptions.GfrUploadRetryLimit)
-        {
-             var response = await _apiHelper.ExecutePostAsync(url, form, header, cancellationToken);
+        {            
+            var response = await _apiHelper.ExecuteFormPostAsync(
+                new GenerateRequest(
+                    url: url, 
+                    form: form,                   
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
                 if (retryAttempts >= _processOptions.GfrUploadRetryLimit)
                 {
                     _logger.LogError(response.Failure, "Error in UploadDocumentAsync: {ErrorMessage}", response.Failure.Message);
-                    return new BatchExtensionException($"Error in UploadDocumentAsync for documentId:{documentId}:{response.Failure.Message}");
+                    return response.Failure;
                 } 
                 retryAttempts++;               
             } else
@@ -514,17 +562,21 @@ internal class GfrService : IGfrService
                 ApiHelper.TokenTypeBasic
             );
 
-            var url = ApiURL(_gfrEndPointsOptions.GetIndexes).Replace("{drawerID}", _GfrApiAccessInfo.DrawerId);
-            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
+            var url = ApiURL(_gfrEndPointsOptions.GetIndexes).Replace("{drawerID}", _GfrApiAccessInfo.DrawerId);            
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateRequest(
+                    url: url, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
-                _logger.LogError(response.Failure, "Unable to get Indexes for drawer {ErrorMessage}", response.Failure.Message);
+                _logger.LogError(response.Failure, "Unable to get Indexes for drawer {Drawer} {ErrorMessage}", _GfrApiAccessInfo.DrawerId, response.Failure.Message);
                 return new BatchExtensionException($"Unable to get Indexes for drawer {_GfrApiAccessInfo.DrawerId} : {response.Failure.Message}");
             }
             var final = await _apiHelper.DeserializeResult<List<GetIndexResponse>>(response.Value);
             if (final.HasFailure)
             {
-                _logger.LogError(response.Failure, "Unable to get Indexes for drawer {ErrorMessage}", response.Failure.Message);
+                _logger.LogError(response.Failure, "Unable to get Deserailize Indexes for drawer {Drawer} {ErrorMessage}", _GfrApiAccessInfo.DrawerId, response.Failure.Message);
                 return new BatchExtensionException($"Unable to get Indexes for drawer {_GfrApiAccessInfo.DrawerId} : {final.Failure.Message}");
             }            
            
@@ -557,8 +609,12 @@ internal class GfrService : IGfrService
                 ApiHelper.TokenTypeBasic
             );
 
-            var url = ApiURL(_gfrEndPointsOptions.GetClientsByDrawerId).Replace("{drawerId}", _GfrApiAccessInfo.DrawerId);          
-            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
+            var url = ApiURL(_gfrEndPointsOptions.GetClientsByDrawerId).Replace("{drawerId}", _GfrApiAccessInfo.DrawerId);                     
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateRequest(
+                    url: url, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             if( response.HasFailure)
             {
                 _logger.LogError(response.Failure, "Unable to get Clients for drawer {DrawerId} {Message}", _GfrApiAccessInfo.DrawerId, response.Failure.Message);
@@ -587,7 +643,7 @@ internal class GfrService : IGfrService
           CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("In {Proc}", "CreateDocumentAsync");
-        _logger.LogDebug("Creating GFR document: {ID} for client: {Number}...", "", "");
+        _logger.LogInformation("Creating GFR document: FilignId:{FilingId} for client: {Number}...", document.FilingId, document.ClientNumber);
         var url = ApiURL(_gfrEndPointsOptions.CreateDocument);
         var requestBody = new CreateDocumentRequest(           
             _GfrApiAccessInfo.DrawerId, 
@@ -600,8 +656,13 @@ internal class GfrService : IGfrService
             appIdKey: _GfrApiAccessInfo.ApiAppId,
             contentType: string.Empty,
             ApiHelper.TokenTypeBasic
-        );
-        var response = await _apiHelper.ExecutePostAsync(url, jsonRequestBody, header, cancellationToken);
+        );        
+        var response = await _apiHelper.ExecuteContentPostAsync(
+            new GenerateRequest(
+                url: url,                 
+                content: jsonRequestBody, 
+                headers: header, 
+                cancellationToken: cancellationToken));
         if (response.HasFailure)
         {
             return new BatchExtensionException($"Unable to create GFR document : {response.Failure.Message}");

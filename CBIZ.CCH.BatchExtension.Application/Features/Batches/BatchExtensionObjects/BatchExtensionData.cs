@@ -5,5 +5,5 @@ namespace CBIZ.CCH.BatchExtension.Application.Features.Batches.BatchExtensionObj
 
 public class BatchExtensionData : BatchExtensionDataBase
 {   
-    public BatchExtensionQueue? Queue { get; init; }  
+    public BatchExtensionQueue? Queue { get; set; }  
 }

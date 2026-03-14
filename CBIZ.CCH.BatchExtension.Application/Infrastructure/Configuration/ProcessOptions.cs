@@ -2,7 +2,9 @@
 
 public record ProcessOptions
 {
-    public int StatusTimeIntervalSeconds { get; init; }
+    public int RequestStatusTimeIntervalInSeconds { get; init; }
+    public double RequestStatusTimeIntervalInMinutesMax { get; init; }
+    public double RetryStatusTimeIntervalInMinutes { get; init; }
     public int StatusRetryLimit { get; init; }
     public required string DownloadFilesDirectory { get; init; }
     public bool UseCchMockData { get; init; }

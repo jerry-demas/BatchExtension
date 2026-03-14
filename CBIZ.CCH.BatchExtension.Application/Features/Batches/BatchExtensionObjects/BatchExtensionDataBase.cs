@@ -6,6 +6,7 @@ public class BatchExtensionDataBase
     public Guid QueueIDGUID { get; set; } 
     public string FirmFlowId { get; set; } = string.Empty;
     public string TaxReturnId { get; set; } = string.Empty;
+    public string ?Pic {get; set; }
     public string ClientName { get; set; } = string.Empty;
     public string ClientNumber { get; set; } = string.Empty;
     public string OfficeLocation { get; set; } = string.Empty;
@@ -21,4 +22,5 @@ public class BatchExtensionDataBase
     public string Message {get; set;} = string.Empty;
     public DateTime CreationDate {get; set;}    
     public DateTime? UpdatedDate { get; set; }
+    public string ?RawMessage {get; set; }
 }
