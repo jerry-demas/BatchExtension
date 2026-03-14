@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure.InternalServices;
 using CBIZ.CCH.BatchExtension.Application.Infrastructure;
 using Cbiz.SharedPackages;
+using CBIZ.CCH.BatchExtension.Application.Infrastructure.Api;
 
 
 namespace CBIZ.CCH.BatchExtension.Application;

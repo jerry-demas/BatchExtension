@@ -4,5 +4,6 @@ public record BatchItemForEmail(
     string FirmFlowId,
     string TaxReturnId,
     string ItemStatus,
-    string StatusDescription
+    string StatusDescription,
+    string Message
 );

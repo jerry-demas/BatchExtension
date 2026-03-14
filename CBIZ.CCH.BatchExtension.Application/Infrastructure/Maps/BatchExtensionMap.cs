@@ -12,7 +12,7 @@ internal class BatchExtensionMap : IEntityTypeConfiguration<BatchExtensionData>
     {
 
         builder.ToTable("BatchExtensionData").HasKey(b => b.Id);
-        builder.Property(b => b.Id).HasDefaultValueSql();
+        builder.Property(b => b.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
         builder.Property(b => b.QueueIDGUID).IsRequired();
         builder.Property(b => b.FirmFlowId).IsRequired().HasMaxLength(50);
         builder.Property(b => b.TaxReturnId).HasMaxLength(50);    
@@ -24,6 +24,8 @@ internal class BatchExtensionMap : IEntityTypeConfiguration<BatchExtensionData>
         builder.Property(b => b.StatusDescription).HasMaxLength(100);
         builder.Property(b => b.FileName).HasMaxLength(100);
         builder.Property(b => b.GfrDocumentId).HasMaxLength(50);
-        builder.Property(b => b.Message).HasMaxLength(200);
+        builder.Property(b => b.Message).IsRequired(false);
+        builder.Property(b => b.Pic).HasMaxLength(100);
+        builder.Property(b => b.RawMessage).IsRequired(false);
     }
 }

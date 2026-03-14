@@ -9,6 +9,8 @@ using System.Text;
 using System.Text.Json;
 using CBIZ.CCH.BatchExtension.Application.Features.CCH.interfaces;
 using CBIZ.CCH.BatchExtension.Application.Features.CCH;
+using CBIZ.CCH.BatchExtension.Application.Infrastructure.Api;
+using Azure.Core.Pipeline;
 
 namespace CBIZ.CCH.BatchExtension.Application.Infrastructure.ExternalServices;
 
@@ -44,17 +46,20 @@ public class CchService : ICchService
             {
                 return;
             }
-            var url = $"{ApiURL(_cchEndPointsOptions.GetCCHAuthorizationToken)}";            
-            var response = await _apiHelper.ExecuteGetAsync(url, null, cancellationToken);
+            var url = $"{ApiURL(_cchEndPointsOptions.GetCCHAuthorizationToken)}";                                   
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateTokenRequest(
+                    url: url,
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
-                _logger.LogError(response.Failure,"Error getting CCH Authentication {Failure}", response.Failure);
+                _logger.LogError(response.Failure,"Error getting CCH Authentication {Failure}", response.Failure.Message);
                 await Task.FromException(new BatchExtensionException("Error getting CCH Authentication"));
             }
-            var final = await _apiHelper.DeserializeResult<OauthTicket>(response.Value);
+            var final = await _apiHelper.DeserializeResult<OauthTicket>(response.Value, isSensitive: true);
             if (final.HasFailure)
             {
-                _logger.LogError(final.Failure,"Error getting CCH Authentication {Failure}", final.Failure);
+                _logger.LogError(final.Failure,"Error getting CCH Authentication {Failure}", final.Failure.Message);
                 await Task.FromException(new BatchExtensionException("Error getting CCH Authentication"));
             }
 
@@ -82,7 +87,7 @@ public class CchService : ICchService
             List<string> returnIds,
             CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("In CreateBatchAsync for queueId: {QueueId}", queueId);
+        _logger.LogInformation("In CreateBatchAsync for queueId: {QueueId}", queueId);
 
         try
         {
@@ -98,17 +103,23 @@ public class CchService : ICchService
             );
 
             var url = $"{ApiURL(_cchEndPointsOptions.CreateBatchAPI)}/{returnType}";
-            StringContent content = new StringContent(JsonSerializer.Serialize(returnIds), Encoding.UTF8, "application/json");
-            var createResponse = await _apiHelper.ExecutePostAsync(url, content, header, cancellationToken);
-            if (createResponse.HasFailure)
-            {
-                return new BatchExtensionException($"Error in CreateBatchAsync: {createResponse.Failure}");                
+            StringContent content = new StringContent(JsonSerializer.Serialize(returnIds), Encoding.UTF8, "application/json");                       
+            var createResponse = await _apiHelper.ExecuteContentPostAsync(
+                new GenerateRequest(url: url,                     
+                    content: content, 
+                    headers: header, 
+                    cancellationToken: cancellationToken));
+            if (createResponse.HasFailure)            
+            {                
+                _logger.LogError(createResponse.Failure,"Error CreateBatchAsync {Failure}", createResponse.Failure.Message);                           
+                return createResponse.Failure;                
             }
 
             var final = await _apiHelper.DeserializeResult<CreateBatchResult>(createResponse.Value);
             if (final.HasFailure)
-            {
-                return new BatchExtensionException($"Create batch CreateBatchAsync for returns: {returnIds}");
+            {               
+                _logger.LogError(final.Failure,"Error CreateBatchAsync:DeserializeResult {Failure}", final.Failure.Message);                
+                return final.Failure;
             }
 
             return final.Value.ExecutionId.ToString();
@@ -148,17 +159,22 @@ public class CchService : ICchService
             var url = $"{ApiURL(_cchEndPointsOptions.GetBatchStatusAPI)}/{executionId}";
             int retryAttempts = 0;
             while (retryAttempts < _processOptions.StatusRetryLimit)
-            {
-                var statusResponse = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
+            {               
+                var statusResponse = await _apiHelper.ExecuteGetAsync(
+                    new GenerateRequest(
+                        url: url,
+                        headers: header,
+                        cancellationToken: cancellationToken));
                 if (statusResponse.HasFailure)
                 {
-                    return new BatchExtensionException($"Error getting status for Execution ID: {executionId}");
+                    return statusResponse.Failure;                    
                 }
 
                 var final = await _apiHelper.DeserializeResult<GetBatchStatusResponse>(statusResponse.Value);
                 if (final.HasFailure)
                 {
-                    return new BatchExtensionException($"Error getting status for Execution ID: {executionId}");
+                    _logger.LogError(final.Failure, "Error Deserailizing GetBatchStatusAsync for Execution ID: {ExecutionId}: {Error}", executionId, final.Failure.Message);
+                    return new BatchExtensionException($"Error getting batch status for Execution ID: {executionId}");
                 }
                 
                 if (final.Value.BatchStatusDescription == BatchRecordStatus.Complete.Description)
@@ -177,9 +193,9 @@ public class CchService : ICchService
 
                 retryAttempts++;
 
-                await Task.Delay(BatchStatusTimeDelay(returnsCount), cancellationToken);
+                await Task.Delay(TimeSpan.FromMinutes(_processOptions.RetryStatusTimeIntervalInMinutes), cancellationToken);
             }
-            return new BatchExtensionException($"Batch did not complete after {_processOptions.StatusRetryLimit} retries.");
+            return new BatchExtensionException($"Batch status did not complete after {_processOptions.StatusRetryLimit} retries.");
         }
         catch (Exception ex)
         {
@@ -209,16 +225,22 @@ public class CchService : ICchService
                 ApiHelper.TokenTypeBearer
             );
 
-            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateRequest(
+                    url: url,
+                    headers: header, 
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
-                return new BatchExtensionException($"Error creating batch output files for Execution ID : {executionId}", response.Failure);
+                _logger.LogError(response.Failure, "Error in CreateBatchOutputFilesAsync:{Error}", response.Failure.Message);
+                return response.Failure;               
             }
 
             var final = await _apiHelper.DeserializeResult<List<CreateBatchOutputFilesResponse>>(response.Value);
             if (final.HasFailure)
             {
-                return new BatchExtensionException($"Error creating batch output files for Execution ID : {executionId}", response.Failure);
+                _logger.LogError(final.Failure, "Error in CreateBatchOutputFilesAsync:DeserializeResult:{Error}", final.Failure.Message);
+                return final.Failure;             
             }
 
             return final.Value;
@@ -255,10 +277,15 @@ public class CchService : ICchService
                 "Bearer"
             );
 
-            var response = await _apiHelper.ExecuteGetAsync(url, header, cancellationToken);
+            var response = await _apiHelper.ExecuteGetAsync(
+                new GenerateRequest(
+                    url: url, 
+                    headers: header,
+                    cancellationToken: cancellationToken));
             if (response.HasFailure)
             {
-                return new BatchExtensionException($"Error downloading file from API: {response.Failure}");
+                _logger.LogError(response.Failure, "Error downloading file from API:{FileName}", fileName);
+                return new BatchExtensionException($"Error downloading file from API: {fileName}");
             }
 
             HelperFunctions.CreateDirectory(_processOptions.DownloadFilesDirectory);
@@ -282,10 +309,15 @@ public class CchService : ICchService
     }
 
     private string ApiURL(string cchAPI) => String.Concat(_cchEndPointsOptions.Domain, "/", cchAPI);
-    private int BatchStatusTimeDelay(int returnCount = 1)
+    
+    private TimeSpan BatchStatusTimeDelay(int returnCount = 1)
     {
-        var milliSeconds = _processOptions.StatusTimeIntervalSeconds * 1000;
-        return milliSeconds * returnCount;
+        TimeSpan secondsSpan = TimeSpan.FromSeconds(_processOptions.RequestStatusTimeIntervalInSeconds * returnCount);
+        TimeSpan minutesSpan = TimeSpan.FromMinutes(_processOptions.RequestStatusTimeIntervalInMinutesMax);                             
+        
+        return secondsSpan < minutesSpan 
+            ? secondsSpan
+            : minutesSpan;
     }
 
     private static bool BatchHasItemsCompleted(GetBatchStatusResponse statusResponse)

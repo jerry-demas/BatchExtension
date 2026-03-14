@@ -38,22 +38,29 @@ Pass this json as the body
 
 ```json
 {
-"SubmittedBy": "FirstName.LastName@cbiz.com",
-    "ReturnType" : "FedOnly", // or "FedState
-    "Returns" : 
-        [
-            {
-                "FirmFlowId" :  ["111113",",555555"],
-                "ReturnId": "2024P:123456:V1"
-            }
-
-        ]
+	"SubmittedBy":"first.last@cbiz.com",
+	"ReturnType":"FedOnly",
+	"Returns":[
+		{	
+			"FirmFlowId":["123456"],
+			"ReturnId":"2025Z:98767:V1",
+			"EngagementType":"1065 PARTNERSHIP TAX",
+			"ClientName":"A Big Company",
+			"ClientNumber":"98767",
+			"OfficeLocation":"NATIONAL TAX OFFICE"
+		}
+	]
 }
 ```
 Result:\
-"QueueId:f534c40c-f2bb-f011-b398-005056b22d70"
+```json
+{
+    "queueId": "5a90d208-0a11-f111-b39c-005056b22d70",
+    "submittedBy": "first.last@cbiz.com"
+}
+```
 
-### getbatchstatus
+### getbatchstatus/{GUID}
 https://URLADDRESS/getbatchstatus/F534C40C-F2BB-F011-B398-005056B22D70\
 Result:
 ```json
@@ -78,4 +85,80 @@ Result:
     }
 ]
 ```
+
+### getbatchstatus
+https://URLADDRESS/getbatchstatus
+Result:
+```json
+[
+    {
+        "queueId": "f534c40c-f2bb-f011-b398-005056b22d70",
+        "queueStatus": "CompletedWithErrors",
+        "batchItems": [
+            {
+                "firmFlowId": ",555555",
+                "taxReturnId": "2024P:123456:V1",
+                "itemStatus": "uploadErr",
+                "statusDescription": "Error GFR upload"
+            },
+            {
+                "firmFlowId": "111113",
+                "taxReturnId": "2024P:123456:V1",
+                "itemStatus": "uploadErr",
+                "statusDescription": "Error GFR upload"
+            }
+        ]
+    },
+     {...},
+     {...} .....
+]
+
+
+### getbatchextensiondata
+https://URLADDRESS/getbatchextensiondata
+
+Result:
+```json
+[
+  {
+    "returnType": "FedOnly",
+    "submittedBy": "jerry.demas@cbiz.com",
+    "queue": null,
+    "id": "fb8b60ac-d7cf-f011-b399-005056b22d70",
+    "queueIDGUID": "f35a2c94-d7cf-f011-b399-005056b22d70",
+    "firmFlowId": "3237962",
+    "taxReturnId": "2024P:271895:V1",
+    "clientName": "HAYES, STANLEY & SIRENA",
+    "clientNumber": "2303718",
+    "officeLocation": "BLUE BELL",
+    "engagementType": "1065 PARTNERSHIP TAX",
+    "batchId": "98b0e257-4882-4422-ab8a-4761c3cab4a4",
+    "batchItemGuid": "d02765db-4c1e-4097-8246-5e23423ec1cd",
+    "batchItemStatus": "add",
+    "statusDescription": "Added",
+    "fileName": "2024US P271895 Extensions V1.pdf",
+    "fileDownLoadedFromCCH": false,
+    "fileUploadedToGFR": false,
+    "gfrDocumentId": "",
+    "message": "",
+    "creationDate": "2025-12-02T18:35:48.697",
+    "updatedDate": "2025-12-02T18:35:48.697"
+  }, { ... }, ....
+]
+
+```
+
+
+
+
+### requeueById
+https://URLADDRESS/requeueById/F534C40C-F2BB-F011-B398-005056B22D70\
+Result:
+```json
+{
+    "queueId": "5a90d208-0a11-f111-b39c-005056b22d70",
+    "submittedBy": "first.last@cbiz.com"
+}
+```
+
 
