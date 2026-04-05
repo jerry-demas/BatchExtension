@@ -18,6 +18,8 @@ services:
       - ${EXTERNAL_PORT}:8080 #8080 for all 
     labels:
       io.portainer.accesscontrol.public: "true"
+    logging:
+      driver: local
       
 volumes:
   keytabs:
